@@ -134,6 +134,7 @@ class Checkpoint(models.Model):
     class Meta:
         db_table = "checkpoints"
         ordering = ["sequence_number"]
+        unique_together = [("job", "sequence_number")]
 
     def __repr__(self) -> str:
         return f"<Checkpoint {self.id} job={self.job_id} seq={self.sequence_number}>"
@@ -252,7 +253,6 @@ class StepOutput(models.Model):
     step_id = models.IntegerField()
     step_name = models.TextField()
     output = models.TextField()
-    error = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

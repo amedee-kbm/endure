@@ -6,7 +6,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from src.api.schemas import JobListResponse, JobResponse, JobSubmitRequest
-from src.constants import VALID_TRANSITIONS, JobState
+from src.constants import CANCELLABLE_STATES, JobState
 from src.models import Checkpoint, DeadLetterJob, Job, JobEvent, StepOutput, Tenant
 from src.services.event_logger import record_event
 
@@ -74,7 +74,7 @@ async def cancel_job(request, job_id: uuid.UUID):
     if not job:
         raise HttpError(404, "Job not found")
 
-    if JobState.CANCELLED not in VALID_TRANSITIONS.get(job.state, set()):
+    if job.state not in CANCELLABLE_STATES:
         raise HttpError(409, f"Cannot cancel job in state {job.state}")
 
     job.state = JobState.CANCELLED

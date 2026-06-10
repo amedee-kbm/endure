@@ -5,6 +5,8 @@ Checkpoint manager — stores blobs directly in PostgreSQL.
 import logging
 import uuid
 
+from django.db import IntegrityError
+
 from src.models import Checkpoint, Job
 
 logger = logging.getLogger("endure.checkpoint.manager")
@@ -13,13 +15,21 @@ logger = logging.getLogger("endure.checkpoint.manager")
 class CheckpointManager:
     async def save_checkpoint(
         self, job_id: uuid.UUID, sequence: int, data: bytes
-    ) -> Checkpoint:
-        checkpoint = await Checkpoint.objects.acreate(
-            job_id=job_id,
-            sequence_number=sequence,
-            data=data,
-            size_bytes=len(data),
-        )
+    ) -> Checkpoint | None:
+        try:
+            checkpoint = await Checkpoint.objects.acreate(
+                job_id=job_id,
+                sequence_number=sequence,
+                data=data,
+                size_bytes=len(data),
+            )
+        except IntegrityError:
+            # A concurrent ghost execution already wrote this (job, sequence_number).
+            # The stored snapshot is equivalent; silently drop the duplicate.
+            logger.debug(
+                f"Checkpoint duplicate for job {job_id} seq={sequence}; dropping"
+            )
+            return None
         logger.info(
             f"Checkpoint saved for job {job_id}: seq={sequence}, size={len(data)}"
         )

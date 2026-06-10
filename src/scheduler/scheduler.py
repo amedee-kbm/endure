@@ -7,6 +7,7 @@ exponential backoff, dead-letter queue, and periodic task scheduling.
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import croniter
@@ -131,7 +132,6 @@ class Scheduler:
             if not job_id_str:
                 break
 
-            import uuid
             job_id = uuid.UUID(job_id_str)
             job = await Job.objects.filter(id=job_id).afirst()
             if not job or job.state != JobState.QUEUED:
@@ -141,7 +141,6 @@ class Scheduler:
             max_concurrent = self._get_tenant_max_concurrent(tenant_id)
             current_count = await self._get_tenant_running_count(tenant_id)
             if current_count >= max_concurrent:
-                # Job stays QUEUED in DB; next cycle will reconsider it.
                 logger.debug(
                     f"Job {job.id} deferred: tenant {tenant_id} at quota "
                     f"({current_count}/{max_concurrent})"
@@ -149,22 +148,31 @@ class Scheduler:
                 break
 
             worker = await self._find_available_worker()
-
             if not worker:
                 break
 
-            job.state = JobState.SCHEDULED
-            job.assigned_worker = worker
-            job.scheduled_at = datetime.now(timezone.utc)
-            worker.inflight_job_count += 1
+            now = datetime.now(timezone.utc)
+            updated = await Job.objects.filter(
+                id=job.id,
+                state=JobState.QUEUED,
+            ).aupdate(
+                state=JobState.SCHEDULED,
+                assigned_worker_id=worker.id,
+                scheduled_at=now,
+                updated_at=now,
+            )
+            if updated == 0:
+                # Job was cancelled or claimed by a concurrent scheduler iteration.
+                logger.debug(f"Job {job.id}: CAS miss on QUEUED→SCHEDULED; skipping")
+                continue
 
+            worker.inflight_job_count += 1
             tenant_slots = dict(worker.tenant_inflight_job_count_map)
-            tenant_key = str(job.tenant_id)  # type: ignore[attr-defined]
+            tenant_key = str(tenant_id)
             tenant_slots[tenant_key] = tenant_slots.get(tenant_key, 0) + 1
             worker.tenant_inflight_job_count_map = tenant_slots
-
             await worker.asave(update_fields=["inflight_job_count", "tenant_inflight_job_count_map"])
-            await job.asave(update_fields=["state", "assigned_worker_id", "scheduled_at"])
+
             await record_event(
                 job.id,
                 "SCHEDULED",
@@ -214,7 +222,11 @@ class Scheduler:
                 )
             ]
             for job in orphaned_jobs:
-                await self._handle_job_failure(job, error="Worker died (missed heartbeat)")
+                await self._handle_job_failure(
+                    job,
+                    error="Worker died (missed heartbeat)",
+                    pre_failure_states=[JobState.SCHEDULED, JobState.RUNNING],
+                )
 
     async def _detect_timed_out_jobs(self):
         now = datetime.now(timezone.utc)
@@ -226,34 +238,81 @@ class Scheduler:
 
         for job in running_jobs:
             elapsed = (now - job.started_at).total_seconds()
-            if elapsed > job.timeout_seconds:
-                logger.warning(
-                    f"Job {job.id} timed out after {elapsed:.0f}s (limit={job.timeout_seconds}s)"
-                )
-                job.state = JobState.TIMED_OUT
-                await job.asave(update_fields=["state"])
-                await record_event(
-                    job.id,
-                    "TIMED_OUT",
-                    detail=f"Timed out after {elapsed:.0f}s (limit={job.timeout_seconds}s)",
-                    attempt=job.attempt,
-                    worker_id=str(job.assigned_worker_id) if job.assigned_worker_id else None,  # type: ignore[attr-defined]
-                )
-                await self._handle_job_failure(job, error=f"Timed out after {elapsed:.0f}s")
+            if elapsed <= job.timeout_seconds:
+                continue
 
-    async def _handle_job_failure(self, job: Job, error: str):
-        job.error_message = error
+            old_worker_id = job.assigned_worker_id  # type: ignore[attr-defined]
+
+            # Ownership-gated: if the worker completed the job between our
+            # read and this write, state != RUNNING and updated == 0 → skip.
+            updated = await Job.objects.filter(
+                id=job.id,
+                state=JobState.RUNNING,
+                assigned_worker_id=old_worker_id,
+            ).aupdate(state=JobState.TIMED_OUT, updated_at=now)
+
+            if updated == 0:
+                logger.info(
+                    f"Job {job.id}: state changed before TIMED_OUT transition; skipping"
+                )
+                continue
+
+            logger.warning(
+                f"Job {job.id} timed out after {elapsed:.0f}s (limit={job.timeout_seconds}s)"
+            )
+            await record_event(
+                job.id,
+                "TIMED_OUT",
+                detail=f"Timed out after {elapsed:.0f}s (limit={job.timeout_seconds}s)",
+                attempt=job.attempt,
+                worker_id=str(old_worker_id) if old_worker_id else None,
+            )
+            await self._handle_job_failure(
+                job,
+                error=f"Timed out after {elapsed:.0f}s",
+                pre_failure_states=[JobState.TIMED_OUT],
+            )
+
+    async def _handle_job_failure(
+        self,
+        job: Job,
+        error: str,
+        pre_failure_states: list | None = None,
+    ):
+        """
+        Transition a failed/dead/timed-out job to QUEUED (retry) or DEAD_LETTER.
+
+        All writes are ownership-gated: if the row's state or assigned_worker_id
+        no longer matches what was seen at sweep time (e.g. the worker legitimately
+        completed the job before we got here), aupdate returns 0 and we skip —
+        no events, no counter decrements.
+        """
+        if pre_failure_states is None:
+            pre_failure_states = [JobState.SCHEDULED, JobState.RUNNING]
+
         old_worker_id = job.assigned_worker_id  # type: ignore[attr-defined]
-        job.assigned_worker = None
+        now = datetime.now(timezone.utc)
 
         if job.attempt < job.max_retries:
             delay = compute_retry_delay(job.attempt)
-            job.state = JobState.QUEUED
-            job.scheduled_at = None
-            job.run_after = datetime.now(timezone.utc) + timedelta(seconds=delay)
-            await job.asave(
-                update_fields=["error_message", "assigned_worker_id", "state", "scheduled_at", "run_after"]
+            updated = await Job.objects.filter(
+                id=job.id,
+                state__in=pre_failure_states,
+                assigned_worker_id=old_worker_id,
+            ).aupdate(
+                state=JobState.QUEUED,
+                assigned_worker_id=None,
+                scheduled_at=None,
+                started_at=None,
+                error_message=error,
+                run_after=now + timedelta(seconds=delay),
+                updated_at=now,
             )
+            if updated == 0:
+                logger.info(
+                    f"Job {job.id}: ownership/state changed before coordinator re-queue; skipping"
+                )
+                return
             await record_event(
                 job.id,
                 "RETRIED",
@@ -266,8 +325,21 @@ class Scheduler:
                 f"delay={delay:.1f}s)"
             )
         else:
-            job.state = JobState.DEAD_LETTER
-            await job.asave(update_fields=["error_message", "assigned_worker_id", "state"])
+            updated = await Job.objects.filter(
+                id=job.id,
+                state__in=pre_failure_states,
+                assigned_worker_id=old_worker_id,
+            ).aupdate(
+                state=JobState.DEAD_LETTER,
+                assigned_worker_id=None,
+                error_message=error,
+                updated_at=now,
+            )
+            if updated == 0:
+                logger.info(
+                    f"Job {job.id}: ownership/state changed before coordinator dead-letter; skipping"
+                )
+                return
             await DeadLetterJob.objects.acreate(
                 job=job,
                 final_error=error,
@@ -284,6 +356,8 @@ class Scheduler:
                 f"Job {job.id} moved to dead letter after {job.attempt} attempts: {error}"
             )
 
+        # Decrement the dead/timed-out worker's inflight counters only when the
+        # CAS succeeded — i.e., we actually claimed the transition.
         if old_worker_id:
             worker = await Worker.objects.filter(id=old_worker_id).afirst()
             if worker:

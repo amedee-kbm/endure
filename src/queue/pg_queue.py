@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from django.db import transaction
 from django.db.models import Q
 
 from src.constants import JobState
@@ -29,14 +30,24 @@ class PgQueue:
         pass
 
     async def dequeue_job(self) -> str | None:
-        """Return the ID of the next QUEUED job whose run_after has elapsed."""
+        """
+        Atomically claim the oldest ready QUEUED job.
+
+        select_for_update(skip_locked=True) inside a transaction ensures that
+        two concurrent dispatchers (e.g. during leader-failover overlap) each
+        see a distinct job and never return the same ID.  The lock is held only
+        for the duration of the atomic block, so the caller must still do a
+        CAS-style aupdate when it transitions the job to SCHEDULED.
+        """
         now = datetime.now(timezone.utc)
-        job = await (
-            Job.objects.filter(state=JobState.QUEUED)
-            .filter(Q(run_after__isnull=True) | Q(run_after__lte=now))
-            .order_by("created_at")
-            .afirst()
-        )
+        async with transaction.atomic():
+            job = await (
+                Job.objects.filter(state=JobState.QUEUED)
+                .filter(Q(run_after__isnull=True) | Q(run_after__lte=now))
+                .order_by("created_at")
+                .select_for_update(skip_locked=True)
+                .afirst()
+            )
         return str(job.id) if job else None
 
     async def remove_job(self, job_id: uuid.UUID) -> None:
