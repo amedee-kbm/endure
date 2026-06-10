@@ -1,6 +1,8 @@
 import json
 import logging
 
+from src.framework.context import _current_stage, _step_counter
+
 logger = logging.getLogger("endure.framework.pipeline")
 
 
@@ -33,6 +35,9 @@ class Pipeline:
             if stage_name in completed:
                 logger.debug(f"Skipping completed stage: {stage_name}")
                 continue
+
+            _current_stage.set(stage_name)
+            _step_counter.set(0)
 
             logger.info(f"Running stage: {stage_name}")
             stage_fn = getattr(self, stage_name)

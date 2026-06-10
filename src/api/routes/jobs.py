@@ -12,7 +12,7 @@ from src.services.event_logger import record_event
 
 router = Router()
 
-RETRYABLE_STATES = {JobState.FAILED, JobState.TIMED_OUT, JobState.DEAD_LETTER}
+RETRYABLE_STATES = {JobState.DEAD_LETTER}
 
 
 @router.post("", response={201: JobResponse})
@@ -94,7 +94,7 @@ async def retry_job(request, job_id: uuid.UUID):
     if job.state not in RETRYABLE_STATES:
         raise HttpError(
             409,
-            f"Cannot retry job in state {job.state}. Must be FAILED, TIMED_OUT, or DEAD_LETTER.",
+            f"Cannot retry job in state {job.state}. Job must be in DEAD_LETTER.",
         )
 
     await record_event(
@@ -104,8 +104,7 @@ async def retry_job(request, job_id: uuid.UUID):
         attempt=job.attempt,
     )
 
-    if job.state == JobState.DEAD_LETTER:
-        await DeadLetterJob.objects.filter(job_id=job_id).adelete()
+    await DeadLetterJob.objects.filter(job_id=job_id).adelete()
 
     job.state = JobState.QUEUED
     job.attempt = 0

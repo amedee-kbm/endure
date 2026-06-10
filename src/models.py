@@ -250,17 +250,18 @@ class PeriodicTask(models.Model):
 
 class StepOutput(models.Model):
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="step_outputs")
+    stage_name = models.TextField(default="")
     step_id = models.IntegerField()
     step_name = models.TextField()
     output = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [("job", "step_id")]
-        ordering = ["step_id"]
+        unique_together = [("job", "stage_name", "step_id")]
+        ordering = ["stage_name", "step_id"]
 
     def __repr__(self) -> str:
-        return f"<StepOutput job={self.job_id} step_id={self.step_id} name={self.step_name}>"
+        return f"<StepOutput job={self.job_id} stage={self.stage_name} step_id={self.step_id} name={self.step_name}>"
 
 
 # ---------------------------------------------------------------------------

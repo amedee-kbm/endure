@@ -8,7 +8,7 @@ import traceback
 import uuid
 
 from src.checkpoint.manager import checkpoint_manager
-from src.framework.context import _current_job_id, _step_counter
+from src.framework.context import _current_job_id, _current_stage, _step_counter
 
 logger = logging.getLogger("endure.worker.executor")
 
@@ -78,6 +78,7 @@ class JobExecutor:
                     logger.error(f"Failed to load checkpoint for job {job_id}: {e}")
 
             tok_job = _current_job_id.set(job_id) if job_id is not None else None
+            tok_stage = _current_stage.set("")
             tok_counter = _step_counter.set(0)
             try:
                 if use_checkpointing:
@@ -90,6 +91,7 @@ class JobExecutor:
             finally:
                 if tok_job is not None:
                     _current_job_id.reset(tok_job)
+                _current_stage.reset(tok_stage)
                 _step_counter.reset(tok_counter)
 
             return {"success": True, "result": result}

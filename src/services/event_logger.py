@@ -23,7 +23,7 @@ async def record_event(
 
     Common event names:
       CREATED, QUEUED, SCHEDULED, RUNNING, COMPLETED,
-      FAILED, RETRIED, DEAD_LETTER, CANCELLED, TIMED_OUT, MANUAL_RETRY
+      FAILED, DEAD_LETTER, CANCELLED, TIMED_OUT, MANUAL_RETRY
     """
     return await JobEvent.objects.acreate(
         job_id=job_id,
