@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {"name":"Python Debugger: Current File","type":"debugpy","request":"launch","program":"${file}","console":"integratedTerminal"},
+    {
+      "name": "Debug chaos recovery test",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "src/evaluate/test_chaos_recovery.py",
+        "-v",
+        "-s"
+      ],
+      "env": {
+        "ENDURE_CHAOS": "1",
+        "DJANGO_SETTINGS_MODULE": "endure.test_settings",
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Debug test_checkpoint_resume_after_worker_kill",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "src/evaluate/test_checkpoint.py::test_checkpoint_resume_after_worker_kill",
+        "-v",
+        "-s"
+      ],
+      "env": {
+        "ENDURE_CHAOS": "1",
+        "DJANGO_SETTINGS_MODULE": "endure.test_settings",
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

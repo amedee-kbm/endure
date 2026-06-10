@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: endure
+      POSTGRES_USER: endure
+      POSTGRES_PASSWORD: endure
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U endure"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: python manage.py migrate --no-input
+    environment: &django_env
+      ENDURE_DATABASE_NAME: endure
+      ENDURE_DATABASE_USER: endure
+      ENDURE_DATABASE_PASSWORD: endure
+      ENDURE_DATABASE_HOST: postgres
+      ENDURE_DATABASE_PORT: "5432"
+      ENDURE_REDIS_URL: redis://redis:6379/0
+      ENDURE_CHECKPOINT_DIR: /data/checkpoints
+      ENDURE_SCHEDULER_LOOP_INTERVAL: "${ENDURE_SCHEDULER_LOOP_INTERVAL:-0.1}"
+      ENDURE_LEADER_LOCK_TTL: "15.0"
+      ENDURE_LEADER_HEARTBEAT_INTERVAL: "5.0"
+      ENDURE_WORKER_MAX_INFLIGHT_JOBS: "${ENDURE_WORKER_MAX_INFLIGHT_JOBS:-4}"
+      ENDURE_WORKER_HEARTBEAT_INTERVAL: "5.0"
+      ENDURE_WORKER_HEARTBEAT_TIMEOUT: "30.0"
+      ENDURE_USE_PROCESS_ISOLATION: "${ENDURE_USE_PROCESS_ISOLATION:-false}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+      - checkpoints:/data/checkpoints
+
+  api:
+    build: .
+    command: uvicorn endure.asgi:application --host 0.0.0.0 --port 8000 --reload
+    environment: *django_env
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+      - checkpoints:/data/checkpoints
+    container_name: endure-api
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/admin/health')"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  scheduler:
+    build: .
+    command: python manage.py runscheduler
+    environment:
+      <<: *django_env
+      ENDURE_SCHEDULER_INSTANCE_ID: "endure-scheduler"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+      - checkpoints:/data/checkpoints
+    container_name: endure-scheduler
+
+  scheduler-standby:
+    build: .
+    command: python manage.py runscheduler
+    environment:
+      <<: *django_env
+      ENDURE_SCHEDULER_INSTANCE_ID: "endure-scheduler-standby"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+      - checkpoints:/data/checkpoints
+    container_name: endure-scheduler-standby
+
+  worker:
+    # Use --scale worker=2 when running chaos tests (one worker will be killed)
+    build: .
+    command: python manage.py runworker
+    environment: *django_env
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/.venv
+      - checkpoints:/data/checkpoints
+
+volumes:
+  pgdata:
+  checkpoints:

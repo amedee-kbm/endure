@@ -1,0 +1,90 @@
+[
+  {
+    "workers": 1,
+    "slots": 4,
+    "target_rate": 8.0,
+    "jobs_per_s": 1.6333333333333333,
+    "p50_ms": 13003.7638,
+    "p95_ms": 27712.317519999997,
+    "p99_ms": 28197.17848,
+    "dropped": 40,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 2,
+    "slots": 8,
+    "target_rate": 8.0,
+    "jobs_per_s": 3.3333333333333335,
+    "p50_ms": 10963.3613,
+    "p95_ms": 20225.75113,
+    "p99_ms": 21372.937669000003,
+    "dropped": 16,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 3,
+    "slots": 12,
+    "target_rate": 8.0,
+    "jobs_per_s": 3.3,
+    "p50_ms": 15364.5229,
+    "p95_ms": 21709.92447,
+    "p99_ms": 22210.244217999996,
+    "dropped": 19,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 4,
+    "slots": 16,
+    "target_rate": 8.0,
+    "jobs_per_s": 3.8,
+    "p50_ms": 11410.48025,
+    "p95_ms": 19141.923235,
+    "p99_ms": 19714.521094,
+    "dropped": 13,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 5,
+    "slots": 20,
+    "target_rate": 8.0,
+    "jobs_per_s": 5.2,
+    "p50_ms": 10736.4753,
+    "p95_ms": 16612.885224999998,
+    "p99_ms": 16899.512815,
+    "dropped": 4,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 6,
+    "slots": 24,
+    "target_rate": 8.0,
+    "jobs_per_s": 5.733333333333333,
+    "p50_ms": 8368.1461,
+    "p95_ms": 13066.631094999999,
+    "p99_ms": 14273.898978,
+    "dropped": 0,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 7,
+    "slots": 28,
+    "target_rate": 8.0,
+    "jobs_per_s": 6.233333333333333,
+    "p50_ms": 6756.0707,
+    "p95_ms": 11116.20579,
+    "p99_ms": 11361.2112,
+    "dropped": 0,
+    "k6_exit_code": 0
+  },
+  {
+    "workers": 8,
+    "slots": 32,
+    "target_rate": 8.0,
+    "jobs_per_s": 8.0,
+    "p50_ms": 5146.7144499999995,
+    "p95_ms": 6444.89344,
+    "p99_ms": 6790.719475999998,
+    "dropped": 0,
+    "k6_exit_code": 0
+  }
+]

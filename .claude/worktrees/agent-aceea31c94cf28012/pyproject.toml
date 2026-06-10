@@ -1,0 +1,39 @@
+[project]
+name = "endure"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.0.5",
+    "django-environ>=0.13.0",
+    "django-ninja>=1.6.2",
+    "openpyxl>=3.1",
+    "psycopg[binary]>=3.3.4",
+    "pydantic-settings>=2.14.1",
+    "redis[hiredis]>=8.0.0",
+    "ruff>=0.15.14",
+]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "endure.settings"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "endure.test_settings"
+asyncio_mode = "auto"
+testpaths = ["src/tests"]
+markers = [
+    "integration: requires real DB and filesystem",
+    "e2e: requires running Docker Compose stack",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs[compatible-mypy]>=6.0.5",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-django>=4.10",
+]

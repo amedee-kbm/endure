@@ -1,0 +1,21 @@
+{
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "src/tests",
+    "src/evaluate"
+  ],
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": [
+          "comment"
+        ],
+        "settings": {
+          "foreground": "#808080"
+        }
+      }
+    ],
+    "comments": ""
+  }
+}

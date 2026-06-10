@@ -1,0 +1,112 @@
+[
+  {
+    "n_orders": 200,
+    "runs": 5,
+    "completed": 5,
+    "p50_s": 2.05,
+    "p95_s": 2.06,
+    "median_s": 2.05,
+    "times_s": [
+      2.03,
+      2.05,
+      2.06,
+      2.06,
+      2.05
+    ],
+    "states": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED"
+    ]
+  },
+  {
+    "n_orders": 1000,
+    "runs": 5,
+    "completed": 5,
+    "p50_s": 2.06,
+    "p95_s": 2.08,
+    "median_s": 2.06,
+    "times_s": [
+      2.06,
+      2.05,
+      2.08,
+      2.06,
+      2.06
+    ],
+    "states": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED"
+    ]
+  },
+  {
+    "n_orders": 5000,
+    "runs": 5,
+    "completed": 5,
+    "p50_s": 2.08,
+    "p95_s": 2.09,
+    "median_s": 2.08,
+    "times_s": [
+      2.05,
+      2.08,
+      2.09,
+      2.08,
+      2.06
+    ],
+    "states": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED"
+    ]
+  },
+  {
+    "n_orders": 20000,
+    "runs": 5,
+    "completed": 5,
+    "p50_s": 2.14,
+    "p95_s": 2.16,
+    "median_s": 2.14,
+    "times_s": [
+      2.16,
+      2.14,
+      2.14,
+      2.12,
+      2.16
+    ],
+    "states": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED"
+    ]
+  },
+  {
+    "n_orders": 100000,
+    "runs": 5,
+    "completed": 5,
+    "p50_s": 4.58,
+    "p95_s": 4.66,
+    "median_s": 4.58,
+    "times_s": [
+      4.58,
+      4.56,
+      4.58,
+      4.61,
+      4.67
+    ],
+    "states": [
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED",
+      "COMPLETED"
+    ]
+  }
+]
