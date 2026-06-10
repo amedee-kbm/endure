@@ -147,12 +147,8 @@ DEFAULT_MAX_RETRIES = env.int("ENDURE_DEFAULT_MAX_RETRIES", default=3)
 RETRY_BASE_DELAY = env.float("ENDURE_RETRY_BASE_DELAY", default=5.0)
 RETRY_MAX_DELAY = env.float("ENDURE_RETRY_MAX_DELAY", default=300.0)
 
-CHECKPOINT_DIR = env.str("ENDURE_CHECKPOINT_DIR", default="/tmp/endure-checkpoints")
-
-USE_PROCESS_ISOLATION = env.bool("ENDURE_USE_PROCESS_ISOLATION", default=False)
-
 SCHEDULER_INSTANCE_ID = env.str("ENDURE_SCHEDULER_INSTANCE_ID", default="")
 
-REDIS_URL = env.str("ENDURE_REDIS_URL", default="redis://localhost:6379/0")
+WORKER_POLL_INTERVAL = env.float("ENDURE_WORKER_POLL_INTERVAL", default=1.0)
 
 REPORT_OUTPUT_DIR = env.str("ENDURE_REPORT_OUTPUT_DIR", default="/tmp/endure-reports")

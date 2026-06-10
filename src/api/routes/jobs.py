@@ -8,8 +8,6 @@ from ninja.errors import HttpError
 from src.api.schemas import JobListResponse, JobResponse, JobSubmitRequest
 from src.constants import VALID_TRANSITIONS, JobState
 from src.models import Checkpoint, DeadLetterJob, Job, JobEvent, StepOutput, Tenant
-from src.queue.redis_queue import redis_queue
-from src.scheduler.priority_queue import compute_queue_score
 from src.services.event_logger import record_event
 
 router = Router()
@@ -38,9 +36,6 @@ async def submit_job(request, data: JobSubmitRequest):
     job.state = JobState.QUEUED
     await job.asave(update_fields=["state", "updated_at"])
     await record_event(job.id, "QUEUED", detail="Enqueued for scheduling")
-
-    score = compute_queue_score()
-    await redis_queue.enqueue_job(job.id, score=score)
 
     return 201, job
 
@@ -87,9 +82,6 @@ async def cancel_job(request, job_id: uuid.UUID):
     await job.asave(update_fields=["state", "completed_at", "updated_at"])
     await record_event(job.id, "CANCELLED", detail="Job cancelled by user")
 
-    await redis_queue.remove_job(job_id)
-    await redis_queue.notify_workers({"type": "cancel", "job_id": str(job_id)})
-
     return job
 
 
@@ -135,9 +127,6 @@ async def retry_job(request, job_id: uuid.UUID):
         ]
     )
     await record_event(job.id, "QUEUED", detail="Re-queued after manual retry")
-
-    score = compute_queue_score()
-    await redis_queue.enqueue_job(job.id, score=score)
 
     return job
 
@@ -198,7 +187,6 @@ async def get_job_checkpoints(request, job_id: uuid.UUID):
                 "id": str(cp.id),
                 "sequence_number": cp.sequence_number,
                 "size_bytes": cp.size_bytes,
-                "storage_path": cp.storage_path,
                 "created_at": cp.created_at.isoformat(),
                 "is_latest": latest_cp is not None and cp.id == latest_cp.id,
             }

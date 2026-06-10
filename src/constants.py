@@ -38,5 +38,3 @@ VALID_TRANSITIONS = {
     JobState.DEAD_LETTER: set(),
 }
 
-REDIS_JOB_QUEUE = "endure:queue:jobs"
-REDIS_WORKER_CHANNEL = "endure:channel:workers"

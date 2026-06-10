@@ -19,8 +19,6 @@ from ninja.errors import HttpError
 
 from src.constants import JobState
 from src.models import Job, Tenant
-from src.queue.redis_queue import redis_queue
-from src.scheduler.priority_queue import compute_queue_score
 from src.services.event_logger import record_event
 
 router = Router()
@@ -102,9 +100,6 @@ async def submit_report(request, data: ReportSubmitRequest):
     job.state = JobState.QUEUED
     await job.asave(update_fields=["state", "updated_at"])
     await record_event(job.id, "QUEUED", detail="Enqueued for scheduling")
-
-    score = compute_queue_score()
-    await redis_queue.enqueue_job(job.id, score=score)
 
     return 201, _job_to_report_response(job)
 

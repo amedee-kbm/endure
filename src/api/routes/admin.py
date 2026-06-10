@@ -11,7 +11,7 @@ from pydantic import Field
 
 from src.constants import JobState
 from src.models import DeadLetterJob, Job, PeriodicTask, Tenant
-from src.queue.redis_queue import redis_queue
+from src.queue.pg_queue import pg_queue
 from src.scheduler.leader import LeaderElection
 
 router = Router()
@@ -25,8 +25,8 @@ def health(request):
 
 @router.get("/queue/stats")
 async def queue_stats(request):
-    length = await redis_queue.queue_length()
-    upcoming = await redis_queue.peek_queue(5)
+    length = await pg_queue.queue_length()
+    upcoming = await pg_queue.peek_queue(5)
 
     state_counts: dict[str, int] = {}
     async for row in Job.objects.values("state").annotate(count=Count("id")):

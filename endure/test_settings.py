@@ -7,5 +7,3 @@ DATABASES = {
     }
 }
 
-USE_PROCESS_ISOLATION = False
-CHECKPOINT_DIR = "/tmp/endure-test-checkpoints"

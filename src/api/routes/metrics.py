@@ -6,7 +6,7 @@ from ninja import Router
 
 from src.constants import JobState, WorkerState
 from src.models import Checkpoint, DeadLetterJob, Job, Worker
-from src.queue.redis_queue import redis_queue
+from src.queue.pg_queue import pg_queue
 
 router = Router()
 
@@ -63,7 +63,7 @@ async def get_metrics(request):
     )
 
     # Queue depth
-    queue_depth = await redis_queue.queue_length()
+    queue_depth = await pg_queue.queue_length()
 
     # Worker metrics grouped by state
     worker_stats: dict[str, dict] = {}

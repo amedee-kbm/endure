@@ -1,25 +1,21 @@
 """
 Worker main loop.
-Listens for job assignments via Redis pub/sub, executes them, reports results.
-Handles cancellation notifications.
+Polls PostgreSQL for job assignments, executes them, reports results.
 """
 
 import asyncio
-import json
 import logging
 import os
 import socket
-import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.db.models import F
 
 from src.constants import JobState, WorkerState
 from src.models import DeadLetterJob, Job, Worker
-from src.queue.redis_queue import redis_queue
-from src.scheduler.priority_queue import compute_queue_score, compute_retry_delay
+from src.scheduler.priority_queue import compute_retry_delay
 from src.services.event_logger import record_event
 from src.worker.executor import JobExecutor
 from src.worker.heartbeat import HeartbeatSender
@@ -45,9 +41,7 @@ class WorkerNode:
         logger.info(
             f"Worker {self.worker_id} starting on {self.hostname}:{self.pid}..."
         )
-        await redis_queue.connect()
 
-        # Register in database
         await Worker.objects.acreate(
             id=self.worker_id,
             hostname=self.hostname,
@@ -59,10 +53,8 @@ class WorkerNode:
 
         self._running = True
 
-        # Start heartbeat, pub/sub listener, and polling concurrently
         await asyncio.gather(
             self.heartbeat.start(),
-            self._listen_for_jobs(),
             self._poll_for_assigned_jobs(),
         )
 
@@ -71,7 +63,6 @@ class WorkerNode:
         self._running = False
         self.heartbeat.stop()
 
-        # Cancel all active job tasks
         for job_id, task in self._active_jobs.items():
             task.cancel()
             logger.info(f"Cancelled active job {job_id}")
@@ -81,29 +72,14 @@ class WorkerNode:
             worker.state = WorkerState.OFFLINE
             await worker.asave(update_fields=["state"])
 
-        await redis_queue.close()
         logger.info(f"Worker {self.worker_id} stopped.")
 
-    async def _listen_for_jobs(self):
-        """Listen for job assignment notifications via Redis pub/sub."""
-        pubsub = await redis_queue.subscribe_worker_channel()
-
-        while self._running:
-            try:
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
-                if message and message["type"] == "message":
-                    data = json.loads(message["data"])
-                    await self._handle_notification(data)
-            except Exception:
-                logger.exception("Error in pub/sub listener")
-                await asyncio.sleep(1)
-
     async def _poll_for_assigned_jobs(self):
-        """Fallback polling: check DB for assigned jobs in case pub/sub missed them."""
+        """Poll DB for newly assigned jobs and detect cancelled/stolen ones."""
+        poll_interval = getattr(settings, "WORKER_POLL_INTERVAL", 1.0)
         while self._running:
             try:
+                # Pick up newly SCHEDULED jobs assigned to this worker.
                 jobs = [
                     j
                     async for j in Job.objects.filter(
@@ -114,26 +90,26 @@ class WorkerNode:
                     if job.id not in self._active_jobs:
                         task = asyncio.create_task(self._execute_job(job.id))
                         self._active_jobs[job.id] = task
+
+                # Cancel local tasks for jobs that lost ownership in the DB
+                # (cancelled by API, or re-dispatched after false-suspect eviction).
+                if self._active_jobs:
+                    active_ids = list(self._active_jobs.keys())
+                    valid_ids: set[uuid.UUID] = set()
+                    async for jid in Job.objects.filter(
+                        id__in=active_ids,
+                        state__in=[JobState.SCHEDULED, JobState.RUNNING],
+                        assigned_worker_id=self.worker_id,
+                    ).values_list("id", flat=True):
+                        valid_ids.add(jid)
+                    for job_id in active_ids:
+                        if job_id not in valid_ids and job_id not in self._cancelled_jobs:
+                            self._cancel_job(job_id)
+
             except Exception:
                 logger.exception("Error in job polling")
 
-            await asyncio.sleep(settings.SCHEDULER_LOOP_INTERVAL * 2)
-
-    async def _handle_notification(self, data: dict):
-        """Handle a notification from the scheduler."""
-        msg_type = data.get("type")
-
-        if msg_type == "job_assigned":
-            worker_id = data.get("worker_id")
-            if worker_id == str(self.worker_id):
-                job_id = uuid.UUID(data["job_id"])
-                if job_id not in self._active_jobs:
-                    task = asyncio.create_task(self._execute_job(job_id))
-                    self._active_jobs[job_id] = task
-
-        elif msg_type == "cancel":
-            job_id = uuid.UUID(data["job_id"])
-            self._cancel_job(job_id)
+            await asyncio.sleep(poll_interval)
 
     def _cancel_job(self, job_id: uuid.UUID):
         """Cancel a running job task."""
@@ -149,11 +125,6 @@ class WorkerNode:
         job: Job | None = None
         try:
             # Fix 3 — Ownership-gated SCHEDULED → RUNNING.
-            # Both the state and assigned_worker must match this worker.  If
-            # another actor (coordinator sweep, cancel) has already changed
-            # either field, aupdate returns 0 and we abort without executing.
-            # Using F("attempt")+1 makes the increment atomic in SQL and avoids
-            # the double-increment that occurs when two workers race.
             now = datetime.now(timezone.utc)
             updated = await Job.objects.filter(
                 id=job_id,
@@ -184,7 +155,6 @@ class WorkerNode:
                 worker_id=str(self.worker_id),
             )
 
-            # Execute the job (passing job_id enables checkpointing)
             result = await self.executor.execute(
                 job.job_type, job.payload, job_id=job_id, timeout_seconds=job.timeout_seconds
             )
@@ -196,9 +166,6 @@ class WorkerNode:
                 return
 
             # Fix 1 — All terminal-state writes are ownership-gated CAS.
-            # If updated == 0 the coordinator re-dispatched this job while we
-            # were executing (false-suspect scenario): another worker now owns
-            # the slot, so we discard our result and return silently.
             now = datetime.now(timezone.utc)
             if result["success"]:
                 updated = await Job.objects.filter(
@@ -238,6 +205,7 @@ class WorkerNode:
                 )
 
                 if job.attempt < job.max_retries:
+                    delay = compute_retry_delay(job.attempt)
                     updated = await Job.objects.filter(
                         id=job_id,
                         state=JobState.RUNNING,
@@ -248,6 +216,7 @@ class WorkerNode:
                         scheduled_at=None,
                         started_at=None,
                         error_message=error_msg,
+                        run_after=now + timedelta(seconds=delay),
                         updated_at=now,
                     )
                     if updated == 0:
@@ -262,9 +231,6 @@ class WorkerNode:
                         attempt=job.attempt,
                         worker_id=str(self.worker_id),
                     )
-                    delay = compute_retry_delay(job.attempt)
-                    score = compute_queue_score(time.time() + delay)
-                    await redis_queue.enqueue_job(job.id, score=score)
                     logger.info(
                         f"Job {job_id} re-queued for retry "
                         f"(attempt {job.attempt}/{job.max_retries}, delay={delay:.1f}s)"
@@ -330,7 +296,6 @@ class WorkerNode:
             except Exception:
                 logger.exception(f"Failed to mark job {job_id} as failed")
         finally:
-            # Always decrement worker load so slots are freed on completion, failure, or cancellation.
             try:
                 worker = await Worker.objects.filter(id=self.worker_id).afirst()
                 if worker and worker.inflight_job_count > 0:
@@ -357,7 +322,6 @@ async def run_worker(max_inflight_jobs: int | None = None):
     worker = WorkerNode(max_inflight_jobs=max_inflight_jobs)
     try:
         await worker.start()
-        # Keep running until cancelled
         while True:
             await asyncio.sleep(3600)
     except (KeyboardInterrupt, asyncio.CancelledError):

@@ -1,15 +1,13 @@
 """
 Core scheduler loop.
-Dequeues jobs from the FIFO queue and assigns them to available workers.
+Dequeues jobs from PostgreSQL and assigns them to available workers.
 Supports leader election, heartbeat-based failure detection, retry with
 exponential backoff, dead-letter queue, and periodic task scheduling.
 """
 
 import asyncio
 import logging
-import time
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import croniter
 
@@ -18,15 +16,14 @@ from django.db.models import F
 
 from src.constants import JobState, WorkerState
 from src.models import Job, DeadLetterJob, PeriodicTask, Tenant, Worker
-from src.queue.redis_queue import redis_queue
+from src.queue.pg_queue import pg_queue
 from src.scheduler.leader import LeaderElection
-from src.scheduler.priority_queue import compute_queue_score, compute_retry_delay
+from src.scheduler.priority_queue import compute_retry_delay
 from src.services.event_logger import record_event
 
 logger = logging.getLogger("src.scheduler.scheduler")
 
 DEFAULT_MAX_CONCURRENT_JOBS = 10
-
 
 
 class Scheduler:
@@ -39,10 +36,8 @@ class Scheduler:
     async def start(self):
         """Main scheduler loop."""
         logger.info(f"Scheduler starting (instance={self.leader.instance_id})...")
-        await redis_queue.connect()
         self._running = True
 
-        await self._rebuild_queue_from_db()
         await self._load_tenant_configs()
 
         while self._running:
@@ -57,11 +52,7 @@ class Scheduler:
                     if self._heartbeat_counter >= int(
                         settings.LEADER_HEARTBEAT_INTERVAL
                         / settings.SCHEDULER_LOOP_INTERVAL
-                    ): 
-                        # The division above converts a time-based interval (seconds) into an iteration count,
-                        #  so no matter what SCHEDULER_LOOP_INTERVAL is set to,
-                        #  the heartbeat always renews every LEADER_HEARTBEAT_INTERVAL seconds.
-
+                    ):
                         self._heartbeat_counter = 0
                         still_leader = await self.leader.renew_heartbeat()
                         if not still_leader:
@@ -78,7 +69,6 @@ class Scheduler:
     async def stop(self):
         self._running = False
         logger.info("Scheduler stopping...")
-        await redis_queue.close()
 
     async def _load_tenant_configs(self):
         configs = [t async for t in Tenant.objects.all()]
@@ -94,16 +84,8 @@ class Scheduler:
             tenant_id=tenant_id, state__in=[JobState.SCHEDULED, JobState.RUNNING]
         ).acount()
 
-    async def _rebuild_queue_from_db(self):
-        queued_jobs = [j async for j in Job.objects.filter(state=JobState.QUEUED)]
-        for job in queued_jobs:
-            score = compute_queue_score(job.created_at.timestamp())
-            await redis_queue.enqueue_job(job.id, score=score)
-        if queued_jobs:
-            logger.info(f"Rebuilt Redis queue with {len(queued_jobs)} jobs from DB.")
-
     async def _enqueue_periodic_tasks(self):
-        """Find active periodic tasks due to run and enqueue jobs for them."""
+        """Find active periodic tasks due to run and create jobs for them."""
         now_dt = datetime.now(timezone.utc)
         tasks = [
             t async for t in PeriodicTask.objects.filter(
@@ -121,9 +103,6 @@ class Scheduler:
                 state=JobState.QUEUED,
                 periodic_task_id=task.id,
             )
-
-            score = compute_queue_score()
-            await redis_queue.enqueue_job(new_job.id, score=score)
 
             await record_event(
                 new_job.id, "QUEUED", detail=f"Created from periodic task '{task.name}'"
@@ -146,13 +125,13 @@ class Scheduler:
         await self._load_tenant_configs()
 
         assigned = 0
-        deferred_jobs: list[tuple[uuid.UUID, float]] = []
 
         while True:
-            job_id_str = await redis_queue.dequeue_job()
+            job_id_str = await pg_queue.dequeue_job()
             if not job_id_str:
                 break
 
+            import uuid
             job_id = uuid.UUID(job_id_str)
             job = await Job.objects.filter(id=job_id).afirst()
             if not job or job.state != JobState.QUEUED:
@@ -162,19 +141,16 @@ class Scheduler:
             max_concurrent = self._get_tenant_max_concurrent(tenant_id)
             current_count = await self._get_tenant_running_count(tenant_id)
             if current_count >= max_concurrent:
-                score = compute_queue_score(job.created_at.timestamp())
-                deferred_jobs.append((job_id, score))
+                # Job stays QUEUED in DB; next cycle will reconsider it.
                 logger.debug(
                     f"Job {job.id} deferred: tenant {tenant_id} at quota "
                     f"({current_count}/{max_concurrent})"
                 )
-                continue
+                break
 
             worker = await self._find_available_worker()
 
             if not worker:
-                score = compute_queue_score(job.created_at.timestamp())
-                deferred_jobs.append((job_id, score))
                 break
 
             job.state = JobState.SCHEDULED
@@ -197,21 +173,10 @@ class Scheduler:
                 worker_id=str(worker.id),
             )
 
-            await redis_queue.notify_workers(
-                {
-                    "type": "job_assigned",
-                    "job_id": str(job.id),
-                    "worker_id": str(worker.id),
-                }
-            )
-
             assigned += 1
             logger.info(
                 f"Assigned job {job.id} ({job.name}, tenant={tenant_id}) to worker {worker.id}"
             )
-
-        for job_id, score in deferred_jobs:
-            await redis_queue.enqueue_job(job_id, score=score)
 
         if assigned:
             logger.info(f"Scheduling cycle: {assigned} jobs assigned.")
@@ -285,8 +250,9 @@ class Scheduler:
             delay = compute_retry_delay(job.attempt)
             job.state = JobState.QUEUED
             job.scheduled_at = None
+            job.run_after = datetime.now(timezone.utc) + timedelta(seconds=delay)
             await job.asave(
-                update_fields=["error_message", "assigned_worker_id", "state", "scheduled_at"]
+                update_fields=["error_message", "assigned_worker_id", "state", "scheduled_at", "run_after"]
             )
             await record_event(
                 job.id,
@@ -299,8 +265,6 @@ class Scheduler:
                 f"Re-queuing job {job.id} for retry (attempt {job.attempt}/{job.max_retries}, "
                 f"delay={delay:.1f}s)"
             )
-            score = compute_queue_score(time.time() + delay)
-            await redis_queue.enqueue_job(job.id, score=score)
         else:
             job.state = JobState.DEAD_LETTER
             await job.asave(update_fields=["error_message", "assigned_worker_id", "state"])

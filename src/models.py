@@ -82,6 +82,7 @@ class Job(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     scheduled_at = models.DateTimeField(null=True, blank=True)
+    run_after = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     assigned_worker = models.ForeignKey(
@@ -126,7 +127,7 @@ class Checkpoint(models.Model):
         db_index=True,
     )
     sequence_number = models.IntegerField()
-    storage_path = models.TextField()
+    data = models.BinaryField(default=b"")
     size_bytes = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

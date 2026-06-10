@@ -13,14 +13,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   migrate:
     build: .
     command: python manage.py migrate --no-input
@@ -30,22 +22,18 @@ services:
       ENDURE_DATABASE_PASSWORD: endure
       ENDURE_DATABASE_HOST: postgres
       ENDURE_DATABASE_PORT: "5432"
-      ENDURE_REDIS_URL: redis://redis:6379/0
-      ENDURE_CHECKPOINT_DIR: /data/checkpoints
       ENDURE_SCHEDULER_LOOP_INTERVAL: "${ENDURE_SCHEDULER_LOOP_INTERVAL:-0.1}"
       ENDURE_LEADER_LOCK_TTL: "15.0"
       ENDURE_LEADER_HEARTBEAT_INTERVAL: "5.0"
       ENDURE_WORKER_MAX_INFLIGHT_JOBS: "${ENDURE_WORKER_MAX_INFLIGHT_JOBS:-4}"
       ENDURE_WORKER_HEARTBEAT_INTERVAL: "5.0"
       ENDURE_WORKER_HEARTBEAT_TIMEOUT: "30.0"
-      ENDURE_USE_PROCESS_ISOLATION: "${ENDURE_USE_PROCESS_ISOLATION:-false}"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - .:/app
       - /app/.venv
-      - checkpoints:/data/checkpoints
 
   api:
     build: .
@@ -56,12 +44,9 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
     volumes:
       - .:/app
       - /app/.venv
-      - checkpoints:/data/checkpoints
     container_name: endure-api
     healthcheck:
       test:
@@ -84,7 +69,6 @@ services:
     volumes:
       - .:/app
       - /app/.venv
-      - checkpoints:/data/checkpoints
     container_name: endure-scheduler
 
   scheduler-standby:
@@ -99,7 +83,6 @@ services:
     volumes:
       - .:/app
       - /app/.venv
-      - checkpoints:/data/checkpoints
     container_name: endure-scheduler-standby
 
   worker:
@@ -113,8 +96,6 @@ services:
     volumes:
       - .:/app
       - /app/.venv
-      - checkpoints:/data/checkpoints
 
 volumes:
   pgdata:
-  checkpoints:
