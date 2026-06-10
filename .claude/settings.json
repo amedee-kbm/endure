@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C \"c:/Users/akwis/endure/.claude/worktrees/agent-a13954beb5ff850b2\" status --short)"
-    ]
-  }
-}
