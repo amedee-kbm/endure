@@ -41,7 +41,7 @@ def test_live_worker_kill_end_to_end():
         payload={"n_files": N_FILES, "rows_per_file": ROWS,
                  "seed": SEED, "inject_errors": 0},
     )
-    job_id = job["id"]
+    job_id = job["job_id"]
 
     H.wait_for_state(job_id, "RUNNING", timeout=60)
     H.wait_for_checkpoint(job_id, min_count=1, timeout=60)  # past discover

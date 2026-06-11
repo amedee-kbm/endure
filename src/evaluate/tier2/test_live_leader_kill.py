@@ -36,7 +36,7 @@ def test_live_leader_kill_end_to_end():
         payload={"n_files": 8, "rows_per_file": 1000,
                  "seed": SEED, "inject_errors": 0},
     )
-    job_id = job["id"]
+    job_id = job["job_id"]
     H.wait_for_state(job_id, "RUNNING", timeout=60)
 
     container = H.holder_to_container(old["holder_id"])
