@@ -12,6 +12,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import requests
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -135,7 +137,6 @@ def source_file_count(tenant_id: str) -> int:
 # ---------------------------------------------------------------------------
 
 def _api(method: str, path: str, **kwargs) -> Any:
-    import requests  # optional; only needed for live-stack tests
     r = requests.request(method, f"{API_BASE}/api/v1/{path.lstrip('/')}", timeout=30, **kwargs)
     r.raise_for_status()
     return r.json()

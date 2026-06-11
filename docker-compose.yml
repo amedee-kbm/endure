@@ -42,7 +42,9 @@ services:
       context: .
       target: base
     command: uvicorn endure.asgi:application --host 0.0.0.0 --port 8000 --reload
-    environment: *django_env
+    environment:
+      <<: *django_env
+      ENDURE_ALLOWED_HOSTS: api,localhost,127.0.0.1
     ports:
       - "8000:8000"
     depends_on:
