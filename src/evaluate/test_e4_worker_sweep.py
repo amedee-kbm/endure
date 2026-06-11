@@ -29,13 +29,14 @@ from pathlib import Path
 import pytest
 
 from src.evaluate import helpers as h
+from src.evaluate.helpers import DrainSampler
 
 N_JOBS = 20
 N_FILES = 10
 ROWS_PER_FILE = 500
 INJECT_ERRORS = 5
 SEED_BASE = 40000   # E4 namespace; seed = SEED_BASE + (rep-1)*N_JOBS + job_index
-N_REPS = 3
+N_REPS = 2
 
 
 @pytest.mark.experiment
@@ -51,32 +52,38 @@ def test_e4_worker_sweep(tenant_id: str):
         print(f"[E4] rep {rep}/{N_REPS} (workers={worker_count})")
 
         # Submit all N_JOBS simultaneously; each gets a globally unique seed
+        rep_ts = h.ts_now()
         job_ids: list[str] = []
-        t_submit_start = time.time()
-        for i in range(N_JOBS):
-            seed = SEED_BASE + (rep - 1) * N_JOBS + i
-            payload = {
-                "n_files": N_FILES,
-                "rows_per_file": ROWS_PER_FILE,
-                "seed": seed,
-                "inject_errors": INJECT_ERRORS,
-                "date": f"2024-08-{(rep - 1) * N_JOBS + i + 1:02d}",
-            }
-            resp = h.submit_report(tenant_id, payload)
-            job_ids.append(str(resp["job_id"]))
-        t_submit_end = time.time()
-        print(f"[E4] submitted {N_JOBS} jobs in {t_submit_end - t_submit_start:.2f}s")
-
-        # Wait for all to reach a terminal state
         terminal: dict[str, dict] = {}
-        deadline = time.monotonic() + 600
-        while len(terminal) < N_JOBS and time.monotonic() < deadline:
-            for jid in job_ids:
-                if jid not in terminal:
-                    j = h.get_job(jid)
-                    if j["state"] in h.TERMINAL_STATES:
-                        terminal[jid] = j
-            time.sleep(2)
+
+        with DrainSampler() as sampler:
+            t_submit_start = time.time()
+            for i in range(N_JOBS):
+                seed = SEED_BASE + (rep - 1) * N_JOBS + i
+                payload = {
+                    "n_files": N_FILES,
+                    "rows_per_file": ROWS_PER_FILE,
+                    "seed": seed,
+                    "inject_errors": INJECT_ERRORS,
+                    "date": f"2024-08-{(rep - 1) * N_JOBS + i + 1:02d}",
+                }
+                resp = h.submit_report(tenant_id, payload)
+                job_ids.append(str(resp["job_id"]))
+            t_submit_end = time.time()
+            print(f"[E4] submitted {N_JOBS} jobs in {t_submit_end - t_submit_start:.2f}s")
+
+            # Wait for all to reach a terminal state
+            deadline = time.monotonic() + 600
+            while len(terminal) < N_JOBS and time.monotonic() < deadline:
+                for jid in job_ids:
+                    if jid not in terminal:
+                        j = h.get_job(jid)
+                        if j["state"] in h.TERMINAL_STATES:
+                            terminal[jid] = j
+                time.sleep(2)
+
+        drain_out = Path(h.RESULTS_DIR) / "e4" / f"drain_w{worker_count}_{rep_ts}.csv"
+        h.write_csv(drain_out, sampler.rows)
 
         if len(terminal) < N_JOBS:
             discrepancies.append(

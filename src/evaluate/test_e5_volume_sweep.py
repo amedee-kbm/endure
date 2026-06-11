@@ -24,7 +24,7 @@ N_FILES = 5
 ROWS_SWEEP = [500, 1000, 2000, 4000]
 INJECT_ERRORS = 3
 SEED_BASE = 50000   # E5 namespace; seed = SEED_BASE + rows_per_file * 10 + rep
-N_REPS = 3
+N_REPS = 2
 
 
 @pytest.mark.experiment

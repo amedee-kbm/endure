@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from django.db import transaction
 from django.db.models import Q
 
+from asgiref.sync import sync_to_async
+
 from src.constants import JobState
 from src.models import Job
 
@@ -38,16 +40,24 @@ class PgQueue:
         see a distinct job and never return the same ID.  The lock is held only
         for the duration of the atomic block, so the caller must still do a
         CAS-style aupdate when it transitions the job to SCHEDULED.
+
+        Uses sync_to_async to wrap the atomic block because Django 6.x does not
+        expose __aenter__/__aexit__ on the Atomic class.
         """
         now = datetime.now(timezone.utc)
-        async with transaction.atomic():
-            job = await (
-                Job.objects.filter(state=JobState.QUEUED)
-                .filter(Q(run_after__isnull=True) | Q(run_after__lte=now))
-                .order_by("created_at")
-                .select_for_update(skip_locked=True)
-                .afirst()
-            )
+
+        @sync_to_async
+        def _claim():
+            with transaction.atomic():
+                return (
+                    Job.objects.filter(state=JobState.QUEUED)
+                    .filter(Q(run_after__isnull=True) | Q(run_after__lte=now))
+                    .order_by("created_at")
+                    .select_for_update(skip_locked=True)
+                    .first()
+                )
+
+        job = await _claim()
         return str(job.id) if job else None
 
     async def remove_job(self, job_id: uuid.UUID) -> None:

@@ -30,6 +30,9 @@ class Pipeline:
     async def run(self, payload: dict, resume_state=None, checkpoint_callback=None):
         completed = set((resume_state or {}).get("completed_stages", []))
         state: dict = (resume_state or {}).copy()
+        # Seed from resume state so post-resume checkpoints carry the full list
+        # (preserve declared stage order).
+        self._completed_stages = [s for s in self.stages if s in completed]
 
         for stage_name in self.stages:
             if stage_name in completed:
@@ -48,10 +51,10 @@ class Pipeline:
             self._checkpoint_sequence += 1
 
             if checkpoint_callback:
-                snap = {"completed_stages": list(self._completed_stages), **state}
+                snap = {**state, "completed_stages": list(self._completed_stages)}
                 await checkpoint_callback(
                     sequence=self._checkpoint_sequence,
                     data=json.dumps(snap).encode(),
                 )
 
-        return {"completed_stages": list(self._completed_stages), **state}
+        return {**state, "completed_stages": list(self._completed_stages)}

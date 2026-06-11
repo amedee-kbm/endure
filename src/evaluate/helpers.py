@@ -7,13 +7,11 @@ import datetime
 import json
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
-import docker as docker_sdk
-import psycopg2
-import requests
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -94,7 +92,8 @@ def _db_kwargs() -> dict:
     )
 
 
-def db_conn() -> psycopg2.extensions.connection:
+def db_conn():
+    import psycopg2  # optional; only needed for live-stack tests
     return psycopg2.connect(**_db_kwargs())
 
 
@@ -136,7 +135,8 @@ def source_file_count(tenant_id: str) -> int:
 # ---------------------------------------------------------------------------
 
 def _api(method: str, path: str, **kwargs) -> Any:
-    r = requests.request(method, f"{API_BASE}/api/v1/{path}", timeout=30, **kwargs)
+    import requests  # optional; only needed for live-stack tests
+    r = requests.request(method, f"{API_BASE}/api/v1/{path.lstrip('/')}", timeout=30, **kwargs)
     r.raise_for_status()
     return r.json()
 
@@ -158,12 +158,14 @@ def ensure_tenant(name: str) -> dict:
 def submit_report(
     tenant_id: str,
     payload: dict,
+    *,
+    report_type: str = "daily_import",
     max_retries: int = 3,
     timeout_seconds: int = 600,
 ) -> dict:
     return _api("POST", "reports", json={
         "tenant_id": str(tenant_id),
-        "report_type": "daily_import",
+        "report_type": report_type,
         "payload": payload,
         "max_retries": max_retries,
         "timeout_seconds": timeout_seconds,
@@ -267,21 +269,20 @@ def wait_for_step_count(
 
 def wait_for_checkpoint(
     job_id: str,
-    min_seq: int = 1,
+    min_count: int = 1,
     timeout: float = 180,
     interval: float = 2.0,
 ) -> dict:
-    """Wait until a checkpoint with sequence_number >= min_seq exists."""
+    """Wait until at least min_count checkpoints exist for the job."""
     deadline = time.monotonic() + timeout
     data: dict = {}
     while time.monotonic() < deadline:
         data = get_checkpoints(job_id)
-        seqs = [cp["sequence_number"] for cp in data.get("checkpoints", [])]
-        if seqs and max(seqs) >= min_seq:
+        if len(data.get("checkpoints", [])) >= min_count:
             return data
         time.sleep(interval)
     raise TimeoutError(
-        f"Checkpoint seq>={min_seq} never appeared for job {job_id} in {timeout}s"
+        f"Checkpoint count>={min_count} never reached for job {job_id} in {timeout}s"
     )
 
 
@@ -316,7 +317,8 @@ def wait_for_leader_change(
 # Container control (Docker SDK via /var/run/docker.sock)
 # ---------------------------------------------------------------------------
 
-def _docker() -> docker_sdk.DockerClient:
+def _docker():
+    import docker as docker_sdk  # optional; only needed for live-stack tests
     return docker_sdk.from_env()
 
 
@@ -375,3 +377,40 @@ def parse_iso(ts: str) -> datetime.datetime:
 
 def epoch(ts: str) -> float:
     return parse_iso(ts).timestamp()
+
+
+# ---------------------------------------------------------------------------
+# DrainSampler — queue-depth time-series (used by E4a and E4b)
+# ---------------------------------------------------------------------------
+
+class DrainSampler:
+    """Samples job-state counts every `interval` seconds in a background thread."""
+
+    def __init__(self, interval: float = 2.0):
+        self.interval = interval
+        self.rows: list[dict] = []
+        self._stop = threading.Event()
+        self._t0 = time.time()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def _loop(self):
+        while not self._stop.is_set():
+            counts = dict(
+                db_fetchall("SELECT state, COUNT(*) FROM jobs GROUP BY state")
+            )
+            self.rows.append({
+                "t_s": round(time.time() - self._t0, 1),
+                "queued": counts.get("QUEUED", 0),
+                "scheduled": counts.get("SCHEDULED", 0),
+                "running": counts.get("RUNNING", 0),
+                "completed": counts.get("COMPLETED", 0),
+            })
+            self._stop.wait(self.interval)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._thread.join(timeout=5)

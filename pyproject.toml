@@ -42,4 +42,6 @@ markers = [
     "e2e: requires running Docker Compose stack (api, scheduler, workers)",
     "chaos: kills containers; set ENDURE_CHAOS=1 to enable",
     "evaluate: evaluation chapter tests",
+    "live: requires the full docker compose stack",
+    "demonstration: legacy marker, may be removed with the old suite",
 ]
