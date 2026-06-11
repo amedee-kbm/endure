@@ -159,8 +159,8 @@ async def get_step_outputs(request, job_id: uuid.UUID):
         raise HttpError(404, "Job not found")
 
     outputs = await sync_to_async(list)(
-        StepOutput.objects.filter(job=job).order_by("step_id").values(
-            "step_id", "step_name", "created_at"
+        StepOutput.objects.filter(job=job).order_by("stage_name", "step_id").values(
+            "stage_name", "step_id", "step_name", "created_at"
         )
     )
     return {"job_id": str(job_id), "step_outputs": outputs, "count": len(outputs)}

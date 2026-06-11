@@ -1,17 +1,91 @@
-# Extends the base stack with a Locust load-testing service.
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.evaluate.yml up -d
-#   # Then open http://localhost:8089 for the Locust web UI
+# Evaluation stack: demonstrations (D1–D4) + experiments (E1–E5).
+#
+# Documented timing settings (all services share these via x-eval-env):
+#   ENDURE_WORKER_HEARTBEAT_INTERVAL  2.0 s   (send frequency)
+#   ENDURE_WORKER_HEARTBEAT_TIMEOUT  15.0 s   (declare worker OFFLINE after this gap)
+#   ENDURE_LEADER_LOCK_TTL           15.0 s   (standby acquires after this gap)
+#   ENDURE_LEADER_HEARTBEAT_INTERVAL  5.0 s   (leader renewal frequency)
+#   ENDURE_SCHEDULER_LOOP_INTERVAL    0.1 s   (main scheduling tick)
+#   ENDURE_WORKER_POLL_INTERVAL       0.5 s   (job poll frequency)
+#   ENDURE_RETRY_BASE_DELAY           2.0 s   (exponential-backoff base for D2 speed)
+#
+# Entry points (run with docker compose -f docker-compose.yml -f docker-compose.evaluate.yml):
+#
+#   All demonstrations:
+#     docker compose … run --rm runner pytest src/evaluate/ -m demonstration -v
+#
+#   Individual demonstration:
+#     docker compose … run --rm runner pytest src/evaluate/test_d1_e2e.py -v
+#
+#   All experiments (except E4):
+#     docker compose … run --rm runner pytest src/evaluate/ -m experiment -v
+#
+#   E4 worker-count sweep (orchestrated):
+#     bash src/evaluate/run_e4_sweep.sh
+#
+#   Single experiment:
+#     docker compose … run --rm runner pytest src/evaluate/test_e1_stage_recovery.py -v
+
+x-eval-env: &eval-env
+  ENDURE_WORKER_HEARTBEAT_INTERVAL: "2.0"
+  ENDURE_WORKER_HEARTBEAT_TIMEOUT: "15.0"
+  ENDURE_LEADER_LOCK_TTL: "15.0"
+  ENDURE_LEADER_HEARTBEAT_INTERVAL: "5.0"
+  ENDURE_SCHEDULER_LOOP_INTERVAL: "0.1"
+  ENDURE_WORKER_POLL_INTERVAL: "0.5"
+  ENDURE_RETRY_BASE_DELAY: "2.0"
+
 services:
-  locust:
-    image: locustio/locust:latest
-    ports:
-      - "8089:8089"
+  migrate:
+    environment:
+      <<: *eval-env
+
+  api:
+    environment:
+      <<: *eval-env
     volumes:
-      - ./src/evaluate/load:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --host http://api:8000
+      - reports:/tmp/endure-reports
+
+  scheduler:
+    environment:
+      <<: *eval-env
+
+  scheduler-standby:
+    environment:
+      <<: *eval-env
+
+  worker:
+    environment:
+      <<: *eval-env
+    volumes:
+      - reports:/tmp/endure-reports
+    restart: unless-stopped   # auto-restart after SIGKILL (required for E1/E2 recovery)
+
+  runner:
+    build: .
+    command: ["pytest", "src/evaluate/", "-v", "--tb=short"]
+    environment:
+      <<: *eval-env
+      ENDURE_API_URL: "http://api:8000"
+      ENDURE_DATABASE_HOST: "postgres"
+      ENDURE_DATABASE_PORT: "5432"
+      ENDURE_DATABASE_NAME: "endure"
+      ENDURE_DATABASE_USER: "endure"
+      ENDURE_DATABASE_PASSWORD: "endure"
+      ENDURE_RESULTS_DIR: "/app/loadtest-results"
     depends_on:
       api:
         condition: service_healthy
-    environment:
-      ENDURE_TENANT_NAME: locust-tenant
+      scheduler:
+        condition: service_started
+      worker:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /app/.venv
+      - /var/run/docker.sock:/var/run/docker.sock
+      - reports:/tmp/endure-reports
+      - ./loadtest-results:/app/loadtest-results
+
+volumes:
+  reports:
