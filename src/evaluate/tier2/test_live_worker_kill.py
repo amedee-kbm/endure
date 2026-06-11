@@ -35,6 +35,12 @@ def test_live_worker_kill_end_to_end():
         + cfg["scheduler_loop_interval"]
     )
 
+    containers = H.find_service_containers("worker")
+    assert len(containers) == 2, (
+        f"expected 2 worker containers, found {len(containers)}; "
+        "was the stack reconciled? run with --no-deps and --scale worker=2"
+    )
+
     tenant = H.ensure_tenant("tier2")
     job = H.submit_report(
         tenant_id=tenant["id"], report_type="daily_import",

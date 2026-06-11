@@ -48,6 +48,11 @@ def _submit_sleep_job(tenant_id: str, name: str) -> dict:
 
 def test_sleep_sweep_at_configured_worker_count():
     workers = int(os.environ["ENDURE_E4_WORKERS"])
+    containers = H.find_service_containers("worker")
+    assert len(containers) == workers, (
+        f"expected {workers} worker containers, found {len(containers)}; "
+        "was the stack reconciled? run with --no-deps and --scale"
+    )
     online = H.get_workers(state="ONLINE")
     assert len(online) == workers, (
         f"expected {workers} ONLINE workers, found {len(online)}; "

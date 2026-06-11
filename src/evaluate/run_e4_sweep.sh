@@ -31,7 +31,9 @@ for W in "${WORKER_COUNTS[@]}"; do
 
   echo "[E4] stack ready (workers=${W}); running measurement..."
 
-  docker compose ${COMPOSE_FILES} run --rm \
+  # --no-deps: compose run would otherwise reconcile the worker service
+  # back to its default single replica, collapsing the pool mid-measurement
+  docker compose ${COMPOSE_FILES} run --rm --no-deps \
     -e ENDURE_E4_WORKERS="${W}" \
     runner \
     pytest src/evaluate/test_e4_worker_sweep.py -v --tb=short

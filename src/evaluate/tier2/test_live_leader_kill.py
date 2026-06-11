@@ -30,6 +30,12 @@ def test_live_leader_kill_end_to_end():
     old = H.get_leader()
     assert old and old.get("holder_id"), "no current leader; is the stack up?"
 
+    containers = H.find_service_containers("worker")
+    assert len(containers) >= 1, (
+        f"expected at least 1 worker container, found {len(containers)}; "
+        "was the stack reconciled? run with --no-deps"
+    )
+
     tenant = H.ensure_tenant("tier2")
     job = H.submit_report(
         tenant_id=tenant["id"], report_type="daily_import",
