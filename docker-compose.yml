@@ -14,7 +14,9 @@ services:
       retries: 10
 
   migrate:
-    build: .
+    build:
+      context: .
+      target: base
     command: python manage.py migrate --no-input
     environment: &django_env
       ENDURE_DATABASE_NAME: endure
@@ -36,7 +38,9 @@ services:
       - /app/.venv
 
   api:
-    build: .
+    build:
+      context: .
+      target: base
     command: uvicorn endure.asgi:application --host 0.0.0.0 --port 8000 --reload
     environment: *django_env
     ports:
@@ -58,7 +62,9 @@ services:
       retries: 20
 
   scheduler:
-    build: .
+    build:
+      context: .
+      target: base
     command: python manage.py runscheduler
     environment:
       <<: *django_env
@@ -72,7 +78,9 @@ services:
     container_name: endure-scheduler
 
   scheduler-standby:
-    build: .
+    build:
+      context: .
+      target: base
     command: python manage.py runscheduler
     environment:
       <<: *django_env
@@ -87,7 +95,9 @@ services:
 
   worker:
     # Use --scale worker=2 when running chaos tests (one worker will be killed)
-    build: .
+    build:
+      context: .
+      target: base
     command: python manage.py runworker
     environment: *django_env
     depends_on:

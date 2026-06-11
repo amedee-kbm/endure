@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev \
@@ -20,3 +20,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # helps with bind mounts + dev ergonomics
 ENV PYTHONDONTWRITEBYTECODE=1
+
+# Evaluation runner: dev dependencies (pytest etc.) on top of base.
+# git lets helpers.git_commit() record the real hash in result metadata;
+# safe.directory is needed because /app is a bind mount owned by the host.
+FROM base AS runner
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --system --add safe.directory /app
+RUN uv sync --frozen

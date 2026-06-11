@@ -62,7 +62,9 @@ services:
     restart: unless-stopped   # auto-restart after SIGKILL (required for E1/E2 recovery)
 
   runner:
-    build: .
+    build:
+      context: .
+      target: runner
     command: ["pytest", "src/evaluate/", "-v", "--tb=short"]
     environment:
       <<: *eval-env
