@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-06-11T16:27:20.511511+00:00",
+  "git_commit": "ebb196c",
+  "settings": {
+    "worker_heartbeat_interval": 2.0,
+    "worker_heartbeat_timeout": 15.0,
+    "scheduler_loop_interval": 0.1,
+    "worker_poll_interval": 0.5,
+    "leader_lock_ttl": 15.0,
+    "leader_heartbeat_interval": 5.0,
+    "retry_base_delay": 2.0
+  },
+  "analytic_failover_bound_s": 20.0,
+  "observed_kill_to_acquired_s": 10.8,
+  "killed_holder": "endure-scheduler-standby",
+  "new_holder": "endure-scheduler",
+  "scheduled_event_count": 1,
+  "events": [
+    "CREATED",
+    "QUEUED",
+    "SCHEDULED",
+    "RUNNING",
+    "COMPLETED"
+  ],
+  "post_failover_dispatch": "ok"
+}

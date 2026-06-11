@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-06-11T13:04:28.653186+00:00",
+  "git_commit": "c6a1bc7",
+  "settings": {
+    "worker_heartbeat_interval": 2.0,
+    "worker_heartbeat_timeout": 15.0,
+    "scheduler_loop_interval": 0.1,
+    "worker_poll_interval": 0.5,
+    "leader_lock_ttl": 15.0,
+    "leader_heartbeat_interval": 5.0,
+    "retry_base_delay": 2.0
+  },
+  "analytic_detection_bound_s": 17.1,
+  "observed_kill_to_offline_s": 14.19,
+  "observed_kill_to_completed_s": 26.0,
+  "offline_worker": "ad95e973-069f-4d95-b555-25353fa636eb",
+  "step_outputs_count": 10,
+  "events": [
+    "CREATED",
+    "QUEUED",
+    "SCHEDULED",
+    "RUNNING",
+    "RETRIED",
+    "SCHEDULED",
+    "RUNNING",
+    "RUNNING",
+    "COMPLETED"
+  ]
+}

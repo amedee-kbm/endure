@@ -1,0 +1,35 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.12, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\akwis\endure\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+django: version: 6.0.5, settings: endure.settings (from option)
+rootdir: C:\Users\akwis\endure
+configfile: pyproject.toml
+plugins: anyio-4.13.0, locust-2.44.0, asyncio-1.4.0, django-4.12.0, sugar-1.1.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 18 items
+
+src/evaluate/tier1/test_arbitration.py::test_ghost_completed_write_matches_zero_rows PASSED [  5%]
+src/evaluate/tier1/test_arbitration.py::test_stale_assignment_cas_misses_on_cancelled PASSED [ 11%]
+src/evaluate/tier1/test_arbitration.py::test_duplicate_step_row_rejected_and_replayed PASSED [ 16%]
+src/evaluate/tier1/test_arbitration.py::test_duplicate_checkpoint_sequence_swallowed PASSED [ 22%]
+src/evaluate/tier1/test_capacity_gate.py::test_gate_blocks_at_live_capacity PASSED [ 27%]
+src/evaluate/tier1/test_capacity_gate.py::test_gate_frees_when_job_completes PASSED [ 33%]
+src/evaluate/tier1/test_capacity_gate.py::test_least_loaded_worker_wins PASSED [ 38%]
+src/evaluate/tier1/test_pipeline_obligations.py::test_quality_gate_converts_silent_to_loud PASSED [ 44%]
+src/evaluate/tier1/test_pipeline_obligations.py::test_cross_job_idempotency_by_content_hash PASSED [ 50%]
+src/evaluate/tier1/test_recovery.py::test_stage_resume_skips_completed PASSED [ 55%]
+src/evaluate/tier1/test_recovery.py::test_step_resume_replays_recorded PASSED [ 61%]
+src/evaluate/tier1/test_recovery.py::test_double_crash_resume PASSED     [ 66%]
+src/evaluate/tier1/test_recovery.py::test_stage_namespaced_step_identity PASSED [ 72%]
+src/evaluate/tier1/test_time_injection.py::test_sweep_boundary PASSED    [ 77%]
+src/evaluate/tier1/test_time_injection.py::test_lease_takeover_on_expiry_only PASSED [ 83%]
+src/evaluate/tier1/test_time_injection.py::test_run_after_gates_dispatch PASSED [ 88%]
+src/evaluate/tier1/test_time_injection.py::test_timeout_sweep_requeues PASSED [ 94%]
+src/evaluate/tier1/test_time_injection.py::test_exhausted_attempts_dead_letter PASSED [100%]
+
+============================== warnings summary ===============================
+src/evaluate/tier1/test_time_injection.py::test_exhausted_attempts_dead_letter
+  C:\Users\akwis\endure:0: PytestWarning: Error when trying to teardown test databases: OperationalError('database "test_endure" is being accessed by other users\nDETAIL:  There is 1 other session using the database.')
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 18 passed, 1 warning in 16.04s ========================

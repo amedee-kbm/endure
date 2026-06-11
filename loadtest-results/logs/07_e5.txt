@@ -1,0 +1,15 @@
+ Container endure-runner-run-68a68f248cea Creating 
+ Container endure-runner-run-68a68f248cea Created 
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /app/.venv/bin/python
+cachedir: .pytest_cache
+django: version: 6.0.5, settings: endure.settings (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: locust-2.44.0, anyio-4.13.0, sugar-1.1.1, django-4.12.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+src/evaluate/test_e5_volume_sweep.py::test_e5_volume_sweep PASSED        [100%]
+
+============================== 1 passed in 24.83s ==============================

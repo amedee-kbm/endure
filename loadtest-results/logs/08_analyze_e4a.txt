@@ -1,0 +1,8 @@
+  N runs  makespan(s)  speedup efficiency
+-----------------------------------------
+  1    1        230.4     1.00       1.00
+  2    1        114.6     2.01       1.01
+  4    1         58.5     3.94       0.99
+  8    1         35.4     6.50       0.81
+
+wrote loadtest-results\e4a\summary.csv

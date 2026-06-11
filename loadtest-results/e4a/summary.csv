@@ -1,0 +1,5 @@
+worker_count,runs,mean_makespan_s,all_makespans_s,speedup,efficiency
+1,1,230.42,230.4,1.0,1.0
+2,1,114.57,114.6,2.011,1.006
+4,1,58.47,58.5,3.941,0.985
+8,1,35.43,35.4,6.504,0.813

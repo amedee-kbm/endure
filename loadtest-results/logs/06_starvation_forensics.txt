@@ -1,0 +1,46 @@
+=== Starvation forensics, captured 2026-06-11T19:18:36.6381710+02:00 ===
+Stack: E4b w=2 failure preserved; 20 min starvation; forensic state below.
+
+--- workers table (full rows) ---
+-[ RECORD 1 ]-----------------+--------------------------------------------
+id                            | 151f302d-77ab-454b-b9c2-e0999f087ae5
+hostname                      | 7cf06e1dfe1b
+pid                           | 1
+tenant_inflight_job_count_map | {"66f7de38-4ad0-4a0e-a706-df8e262fbfeb": 4}
+max_inflight_jobs             | 4
+inflight_job_count            | 4
+state                         | ONLINE
+last_heartbeat                | 2026-06-11 17:18:36.217998+00
+registered_at                 | 2026-06-11 16:43:58.782368+00
+-[ RECORD 2 ]-----------------+--------------------------------------------
+id                            | 8d96ecb6-8c65-458a-aa27-aa5573d17714
+hostname                      | ae93ce76194b
+pid                           | 1
+tenant_inflight_job_count_map | {"66f7de38-4ad0-4a0e-a706-df8e262fbfeb": 4}
+max_inflight_jobs             | 4
+inflight_job_count            | 4
+state                         | ONLINE
+last_heartbeat                | 2026-06-11 17:18:37.432602+00
+registered_at                 | 2026-06-11 16:43:58.39499+00
+
+
+--- job state counts ---
+   state   | count 
+-----------+-------
+ COMPLETED |    19
+ QUEUED    |    21
+(2 rows)
+
+
+--- scheduler_leader row ---
+ id |        holder_id         |         acquired_at          |          renewed_at           
+----+--------------------------+------------------------------+-------------------------------
+  1 | endure-scheduler-standby | 2026-06-11 16:43:58.05107+00 | 2026-06-11 17:18:32.813285+00
+(1 row)
+
+
+--- docker logs endure-scheduler (full) ---
+(end of scheduler logs)
+
+--- docker logs endure-scheduler-standby (full) ---
+(end of standby logs)

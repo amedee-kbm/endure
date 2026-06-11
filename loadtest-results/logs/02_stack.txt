@@ -1,0 +1,20 @@
+NAME                       IMAGE                      COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+endure-api                 endure-api                 "uvicorn endure.asgi…"   api                 29 seconds ago   Up 7 seconds (healthy)    0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+endure-postgres-1          postgres:15-alpine         "docker-entrypoint.s…"   postgres            38 seconds ago   Up 17 seconds (healthy)   5432/tcp
+endure-scheduler           endure-scheduler           "python manage.py ru…"   scheduler           24 seconds ago   Up 1 second               
+endure-scheduler-standby   endure-scheduler-standby   "python manage.py ru…"   scheduler-standby   24 seconds ago   Up 1 second               
+endure-worker-1            endure-worker              "python manage.py ru…"   worker              24 seconds ago   Up 1 second               
+NAME                       IMAGE                      COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+endure-api                 endure-api                 "uvicorn endure.asgi…"   api                 35 seconds ago   Up 8 seconds (healthy)    0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+endure-postgres-1          postgres:15-alpine         "docker-entrypoint.s…"   postgres            40 seconds ago   Up 19 seconds (healthy)   5432/tcp
+endure-scheduler           endure-scheduler           "python manage.py ru…"   scheduler           28 seconds ago   Up 1 second               
+endure-scheduler-standby   endure-scheduler-standby   "python manage.py ru…"   scheduler-standby   28 seconds ago   Up 1 second               
+endure-worker-1            endure-worker              "python manage.py ru…"   worker              28 seconds ago   Up 1 second               
+endure-worker-2            endure-worker              "python manage.py ru…"   worker              28 seconds ago   Up 1 second               
+NAME                       IMAGE                      COMMAND                  SERVICE             CREATED          STATUS                    PORTS
+endure-api                 endure-api                 "uvicorn endure.asgi…"   api                 46 seconds ago   Up 8 seconds (healthy)    0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+endure-postgres-1          postgres:15-alpine         "docker-entrypoint.s…"   postgres            58 seconds ago   Up 20 seconds (healthy)   5432/tcp
+endure-scheduler           endure-scheduler           "python manage.py ru…"   scheduler           37 seconds ago   Up 1 second               
+endure-scheduler-standby   endure-scheduler-standby   "python manage.py ru…"   scheduler-standby   37 seconds ago   Up 1 second               
+endure-worker-1            endure-worker              "python manage.py ru…"   worker              37 seconds ago   Up 1 second               
+endure-worker-2            endure-worker              "python manage.py ru…"   worker              37 seconds ago   Up 1 second               

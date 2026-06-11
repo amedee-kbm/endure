@@ -1,0 +1,24 @@
+f625fd9300e354880b8c34070944e91fc040c3c6
+29.2.1
+
+OS Name:                       Microsoft Windows 11 Home
+OS Version:                    10.0.26200 N/A Build 26200
+BIOS Version:                  LENOVO JUCN66WW, 31/05/2024
+Total Physical Memory:         15,557 MB
+
+model name	: AMD Ryzen 5 6600H with Radeon Graphics
+8
+--- post-fix commit (runner image fix) ---
+8d778c01396f7112e8d5d2be399cac8dbc6f17b6
+--- post-fix commit (allowed-hosts/requests/profile) ---
+2db64c03bd43935846c247270a8512f9b13a16a8
+--- post-fix commit (tier2 job_id key) ---
+b6bf463bc956a790e494eb7b2f3464a2515a19a5
+--- post-fix commit (kill_worker_owning, scale=2 chaos) ---
+9c66bc65947736763e10173c4b35d68c86507082
+--- post-fix commit (--no-deps, container-count guards) ---
+c6a1bc767a9dcca25bba3a72d618bbb1e33f8fa5
+--- post-fix commit (leader-kill sizing/seed/probe) ---
+ebb196c2c18a89443216ec40c8029c512490cf27
+--- post-fix commit (derived capacity, starvation fix) ---
+d51a0169b3107dfc267c951c200c93a211647fa0

@@ -1,0 +1,255 @@
+
+========================================================
+ E4: cold-starting stack with --scale worker=1
+========================================================
+ Network endure_default Creating 
+ Network endure_default Created 
+ Volume endure_reports Creating 
+ Volume endure_reports Created 
+ Volume endure_pgdata Creating 
+ Volume endure_pgdata Created 
+ Container endure-postgres-1 Creating 
+ Container endure-postgres-1 Created 
+ Container endure-migrate-1 Creating 
+ Container endure-migrate-1 Created 
+ Container endure-api Creating 
+ Container endure-api Created 
+ Container endure-worker-1 Creating 
+ Container endure-scheduler-standby Creating 
+ Container endure-scheduler Creating 
+ Container endure-scheduler-standby Created 
+ Container endure-worker-1 Created 
+ Container endure-scheduler Created 
+ Container endure-postgres-1 Starting 
+ Container endure-postgres-1 Started 
+ Container endure-postgres-1 Waiting 
+ Container endure-postgres-1 Healthy 
+ Container endure-migrate-1 Starting 
+ Container endure-migrate-1 Started 
+ Container endure-migrate-1 Waiting 
+ Container endure-migrate-1 Exited 
+ Container endure-api Starting 
+ Container endure-api Started 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Healthy 
+ Container endure-scheduler-standby Starting 
+ Container endure-api Healthy 
+ Container endure-worker-1 Starting 
+ Container endure-api Healthy 
+ Container endure-scheduler Starting 
+ Container endure-scheduler-standby Started 
+ Container endure-worker-1 Started 
+ Container endure-scheduler Started 
+ Container endure-api Waiting 
+ Container endure-scheduler Waiting 
+ Container endure-scheduler-standby Waiting 
+ Container endure-worker-1 Waiting 
+ Container endure-postgres-1 Waiting 
+ Container endure-migrate-1 Waiting 
+ Container endure-postgres-1 Healthy 
+ Container endure-worker-1 Healthy 
+ Container endure-api Healthy 
+ Container endure-scheduler Healthy 
+ Container endure-scheduler-standby Healthy 
+ Container endure-migrate-1 Exited 
+[E4] stack ready (workers=1); running measurement...
+ Container endure-runner-run-71634c8574ba Creating 
+ Container endure-runner-run-71634c8574ba Created 
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /app/.venv/bin/python
+cachedir: .pytest_cache
+django: version: 6.0.5, settings: endure.settings (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: locust-2.44.0, anyio-4.13.0, sugar-1.1.1, django-4.12.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+src/evaluate/test_e4_worker_sweep.py::test_e4_worker_sweep PASSED        [100%]
+
+========================= 1 passed in 62.82s (0:01:02) =========================
+[E4] w=1 done
+
+========================================================
+ E4: cold-starting stack with --scale worker=2
+========================================================
+ Network endure_default Creating 
+ Network endure_default Created 
+ Volume endure_reports Creating 
+ Volume endure_reports Created 
+ Volume endure_pgdata Creating 
+ Volume endure_pgdata Created 
+ Container endure-postgres-1 Creating 
+ Container endure-postgres-1 Created 
+ Container endure-migrate-1 Creating 
+ Container endure-migrate-1 Created 
+ Container endure-api Creating 
+ Container endure-api Created 
+ Container endure-worker-2 Creating 
+ Container endure-worker-1 Creating 
+ Container endure-scheduler Creating 
+ Container endure-scheduler-standby Creating 
+ Container endure-worker-1 Created 
+ Container endure-scheduler-standby Created 
+ Container endure-worker-2 Created 
+ Container endure-scheduler Created 
+ Container endure-postgres-1 Starting 
+ Container endure-postgres-1 Started 
+ Container endure-postgres-1 Waiting 
+ Container endure-postgres-1 Healthy 
+ Container endure-migrate-1 Starting 
+ Container endure-migrate-1 Started 
+ Container endure-migrate-1 Waiting 
+ Container endure-migrate-1 Exited 
+ Container endure-api Starting 
+ Container endure-api Started 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Healthy 
+ Container endure-scheduler Starting 
+ Container endure-api Healthy 
+ Container endure-scheduler-standby Starting 
+ Container endure-api Healthy 
+ Container endure-worker-2 Starting 
+ Container endure-scheduler Started 
+ Container endure-worker-2 Started 
+ Container endure-worker-1 Starting 
+ Container endure-scheduler-standby Started 
+ Container endure-worker-1 Started 
+ Container endure-worker-2 Waiting 
+ Container endure-worker-1 Waiting 
+ Container endure-postgres-1 Waiting 
+ Container endure-migrate-1 Waiting 
+ Container endure-api Waiting 
+ Container endure-scheduler Waiting 
+ Container endure-scheduler-standby Waiting 
+ Container endure-migrate-1 Exited 
+ Container endure-scheduler-standby Healthy 
+ Container endure-worker-2 Healthy 
+ Container endure-worker-1 Healthy 
+ Container endure-scheduler Healthy 
+ Container endure-api Healthy 
+ Container endure-postgres-1 Healthy 
+[E4] stack ready (workers=2); running measurement...
+ Container endure-runner-run-bf7697b0fe89 Creating 
+ Container endure-runner-run-bf7697b0fe89 Created 
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /app/.venv/bin/python
+cachedir: .pytest_cache
+django: version: 6.0.5, settings: endure.settings (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: locust-2.44.0, anyio-4.13.0, sugar-1.1.1, django-4.12.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+src/evaluate/test_e4_worker_sweep.py::test_e4_worker_sweep PASSED        [100%]
+
+============================== 1 passed in 40.17s ==============================
+[E4] w=2 done
+
+========================================================
+ E4: cold-starting stack with --scale worker=4
+========================================================
+ Network endure_default Creating 
+ Network endure_default Created 
+ Volume endure_reports Creating 
+ Volume endure_reports Created 
+ Volume endure_pgdata Creating 
+ Volume endure_pgdata Created 
+ Container endure-postgres-1 Creating 
+ Container endure-postgres-1 Created 
+ Container endure-migrate-1 Creating 
+ Container endure-migrate-1 Created 
+ Container endure-api Creating 
+ Container endure-api Created 
+ Container endure-scheduler Creating 
+ Container endure-worker-4 Creating 
+ Container endure-worker-1 Creating 
+ Container endure-worker-3 Creating 
+ Container endure-worker-2 Creating 
+ Container endure-scheduler-standby Creating 
+ Container endure-worker-1 Created 
+ Container endure-worker-2 Created 
+ Container endure-worker-3 Created 
+ Container endure-scheduler Created 
+ Container endure-scheduler-standby Created 
+ Container endure-worker-4 Created 
+ Container endure-postgres-1 Starting 
+ Container endure-postgres-1 Started 
+ Container endure-postgres-1 Waiting 
+ Container endure-postgres-1 Healthy 
+ Container endure-migrate-1 Starting 
+ Container endure-migrate-1 Started 
+ Container endure-migrate-1 Waiting 
+ Container endure-migrate-1 Exited 
+ Container endure-api Starting 
+ Container endure-api Started 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Waiting 
+ Container endure-api Healthy 
+ Container endure-api Healthy 
+ Container endure-scheduler-standby Starting 
+ Container endure-scheduler Starting 
+ Container endure-api Healthy 
+ Container endure-worker-1 Starting 
+ Container endure-scheduler Started 
+ Container endure-scheduler-standby Started 
+ Container endure-worker-1 Started 
+ Container endure-worker-2 Starting 
+ Container endure-worker-2 Started 
+ Container endure-worker-4 Starting 
+ Container endure-worker-4 Started 
+ Container endure-worker-3 Starting 
+ Container endure-worker-3 Started 
+ Container endure-api Waiting 
+ Container endure-scheduler Waiting 
+ Container endure-scheduler-standby Waiting 
+ Container endure-worker-1 Waiting 
+ Container endure-worker-2 Waiting 
+ Container endure-worker-4 Waiting 
+ Container endure-worker-3 Waiting 
+ Container endure-postgres-1 Waiting 
+ Container endure-migrate-1 Waiting 
+ Container endure-api Healthy 
+ Container endure-scheduler Healthy 
+ Container endure-postgres-1 Healthy 
+ Container endure-scheduler-standby Healthy 
+ Container endure-migrate-1 Exited 
+ Container endure-worker-1 Healthy 
+ Container endure-worker-2 Healthy 
+ Container endure-worker-4 Healthy 
+ Container endure-worker-3 Healthy 
+[E4] stack ready (workers=4); running measurement...
+ Container endure-runner-run-ccdc0ee0cb06 Creating 
+ Container endure-runner-run-ccdc0ee0cb06 Created 
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /app/.venv/bin/python
+cachedir: .pytest_cache
+django: version: 6.0.5, settings: endure.settings (from env)
+rootdir: /app
+configfile: pyproject.toml
+plugins: locust-2.44.0, anyio-4.13.0, sugar-1.1.1, django-4.12.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+src/evaluate/test_e4_worker_sweep.py::test_e4_worker_sweep PASSED        [100%]
+
+============================== 1 passed in 28.20s ==============================
+[E4] w=4 done
+
+All E4 configurations complete. Results in loadtest-results/e4/
+total 30K
+-rw-r--r-- 1 akwis 197609  259 Jun 11 19:49 drain_w1_20260611T174858Z.csv
+-rw-r--r-- 1 akwis 197609  251 Jun 11 19:50 drain_w1_20260611T174933Z.csv
+-rw-r--r-- 1 akwis 197609  184 Jun 11 19:51 drain_w2_20260611T175121Z.csv
+-rw-r--r-- 1 akwis 197609  173 Jun 11 19:52 drain_w2_20260611T175145Z.csv
+-rw-r--r-- 1 akwis 197609  138 Jun 11 19:53 drain_w4_20260611T175329Z.csv
+-rw-r--r-- 1 akwis 197609  127 Jun 11 19:53 drain_w4_20260611T175345Z.csv
+-rw-r--r-- 1 akwis 197609 5.9K Jun 11 19:50 w1_20260611T175007Z.csv
+-rw-r--r-- 1 akwis 197609 5.9K Jun 11 19:52 w2_20260611T175203Z.csv
+-rw-r--r-- 1 akwis 197609 5.9K Jun 11 19:53 w4_20260611T175401Z.csv
