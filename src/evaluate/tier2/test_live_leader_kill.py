@@ -19,7 +19,8 @@ from src.evaluate import helpers as H
 
 pytestmark = pytest.mark.live
 
-SEED = 60002
+SEED = 60003  # single-use per DB lifetime: a reused seed makes discover
+              # skip every file and the job completes before the kill lands
 OUT = Path("loadtest-results/tier2")
 
 
@@ -39,7 +40,7 @@ def test_live_leader_kill_end_to_end():
     tenant = H.ensure_tenant("tier2")
     job = H.submit_report(
         tenant_id=tenant["id"], report_type="daily_import",
-        payload={"n_files": 8, "rows_per_file": 1000,
+        payload={"n_files": 10, "rows_per_file": 2000,
                  "seed": SEED, "inject_errors": 0},
     )
     job_id = job["job_id"]
@@ -63,6 +64,18 @@ def test_live_leader_kill_end_to_end():
         "scheduled_event_count": events.count("SCHEDULED"),
         "events": events,
     }
+
+    # the in-flight job completes on its worker regardless of who holds the
+    # lease; only a fresh dispatch proves the new leader actually coordinates
+    probe = H._api("POST", "/jobs", json={
+        "tenant_id": tenant["id"], "name": "post-failover-dispatch-probe",
+        "job_type": "src.reporting.jobs.sleep_job:SleepJob",
+        "payload": {"duration_s": 2.0},
+        "max_retries": 3, "timeout_seconds": 120,
+    })
+    H.wait_for_state(probe["id"], "COMPLETED", timeout=90)
+    result["post_failover_dispatch"] = "ok"
+
     OUT.mkdir(parents=True, exist_ok=True)
     H.write_json(OUT / f"leader_kill_{H.ts_now()}.json", result)
 
