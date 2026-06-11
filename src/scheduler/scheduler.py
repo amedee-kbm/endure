@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import croniter
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models import Count, F, Q
 
 from src.constants import JobState, WorkerState
 from src.models import Job, DeadLetterJob, PeriodicTask, Tenant, Worker
@@ -166,13 +166,6 @@ class Scheduler:
                 logger.debug(f"Job {job.id}: CAS miss on QUEUED→SCHEDULED; skipping")
                 continue
 
-            worker.inflight_job_count += 1
-            tenant_slots = dict(worker.tenant_inflight_job_count_map)
-            tenant_key = str(tenant_id)
-            tenant_slots[tenant_key] = tenant_slots.get(tenant_key, 0) + 1
-            worker.tenant_inflight_job_count_map = tenant_slots
-            await worker.asave(update_fields=["inflight_job_count", "tenant_inflight_job_count_map"])
-
             await record_event(
                 job.id,
                 "SCHEDULED",
@@ -190,11 +183,24 @@ class Scheduler:
             logger.info(f"Scheduling cycle: {assigned} jobs assigned.")
 
     async def _find_available_worker(self) -> Worker | None:
+        # Load is derived from live job rows, never from a maintained counter:
+        # the counter variant had three uncoordinated read-modify-write writers
+        # and ratcheted to the cap, silently starving dispatch.
         return await (
-            Worker.objects.filter(
-                state=WorkerState.ONLINE, inflight_job_count__lt=F("max_inflight_jobs")
+            Worker.objects.filter(state=WorkerState.ONLINE)
+            .annotate(
+                active=Count(
+                    "assigned_jobs",
+                    filter=Q(
+                        assigned_jobs__state__in=[
+                            JobState.SCHEDULED,
+                            JobState.RUNNING,
+                        ]
+                    ),
+                )
             )
-            .order_by("inflight_job_count")
+            .filter(active__lt=F("max_inflight_jobs"))
+            .order_by("active")
             .afirst()
         )
 
@@ -355,24 +361,6 @@ class Scheduler:
             logger.error(
                 f"Job {job.id} moved to dead letter after {job.attempt} attempts: {error}"
             )
-
-        # Decrement the dead/timed-out worker's inflight counters only when the
-        # CAS succeeded — i.e., we actually claimed the transition.
-        if old_worker_id:
-            worker = await Worker.objects.filter(id=old_worker_id).afirst()
-            if worker:
-                if worker.inflight_job_count > 0:
-                    worker.inflight_job_count -= 1
-                tenant_slots = dict(worker.tenant_inflight_job_count_map)
-                tenant_key = str(job.tenant_id)  # type: ignore[attr-defined]
-                if tenant_key in tenant_slots:
-                    tenant_slots[tenant_key] = max(0, tenant_slots[tenant_key] - 1)
-                    if tenant_slots[tenant_key] == 0:
-                        del tenant_slots[tenant_key]
-                    worker.tenant_inflight_job_count_map = tenant_slots
-                await worker.asave(
-                    update_fields=["inflight_job_count", "tenant_inflight_job_count_map"]
-                )
 
 
 async def run_scheduler():

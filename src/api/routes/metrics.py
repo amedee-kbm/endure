@@ -65,23 +65,36 @@ async def get_metrics(request):
     # Queue depth
     queue_depth = await pg_queue.queue_length()
 
-    # Worker metrics grouped by state
+    # Worker metrics grouped by state; load is derived from live job rows
+    # (counting via the join would inflate Sum/Count, hence the second query)
     worker_stats: dict[str, dict] = {}
     total_capacity = 0
     total_load = 0
     async for row in Worker.objects.values("state").annotate(
         count=Count("id"),
-        load=Sum("inflight_job_count"),
         capacity=Sum("max_inflight_jobs"),
     ):
         worker_stats[row["state"]] = {
             "count": row["count"],
-            "current_load": row["load"] or 0,
+            "current_load": 0,
             "max_slots": row["capacity"] or 0,
         }
         if row["state"] == WorkerState.ONLINE:
             total_capacity = row["capacity"] or 0
-            total_load = row["load"] or 0
+
+    async for row in (
+        Job.objects.filter(
+            state__in=[JobState.SCHEDULED, JobState.RUNNING],
+            assigned_worker__isnull=False,
+        )
+        .values("assigned_worker__state")
+        .annotate(load=Count("id"))
+    ):
+        wstate = row["assigned_worker__state"]
+        if wstate in worker_stats:
+            worker_stats[wstate]["current_load"] = row["load"]
+        if wstate == WorkerState.ONLINE:
+            total_load = row["load"]
 
     utilization = total_load / total_capacity if total_capacity > 0 else 0
 

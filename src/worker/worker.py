@@ -296,23 +296,8 @@ class WorkerNode:
             except Exception:
                 logger.exception(f"Failed to mark job {job_id} as failed")
         finally:
-            try:
-                worker = await Worker.objects.filter(id=self.worker_id).afirst()
-                if worker and worker.inflight_job_count > 0:
-                    worker.inflight_job_count -= 1
-                    if job is not None:
-                        tenant_slots = dict(worker.tenant_inflight_job_count_map)
-                        tid = str(job.tenant_id)  # type: ignore[attr-defined]
-                        if tid in tenant_slots:
-                            tenant_slots[tid] = max(0, tenant_slots[tid] - 1)
-                            if tenant_slots[tid] == 0:
-                                del tenant_slots[tid]
-                            worker.tenant_inflight_job_count_map = tenant_slots
-                    await worker.asave(
-                        update_fields=["inflight_job_count", "tenant_inflight_job_count_map"]
-                    )
-            except Exception:
-                logger.exception(f"Failed to decrement inflight count for job {job_id}")
+            # No counter bookkeeping: the scheduler derives load from live job
+            # rows, and this job has left SCHEDULED/RUNNING by now either way.
             self._active_jobs.pop(job_id, None)
             self._cancelled_jobs.discard(job_id)
 

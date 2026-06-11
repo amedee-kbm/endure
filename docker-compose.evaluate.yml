@@ -27,6 +27,11 @@
 #     docker compose … run --rm runner pytest src/evaluate/test_e1_stage_recovery.py -v
 
 x-eval-env: &eval-env
+  # one job per worker so RQ2 sweeps measure the workers axis cleanly;
+  # EVAL_WORKER_INFLIGHT is deliberately NOT a name .env defines, so the
+  # default below always wins unless explicitly exported (e.g. the slot-
+  # scaling bonus run uses EVAL_WORKER_INFLIGHT=4)
+  ENDURE_WORKER_MAX_INFLIGHT_JOBS: "${EVAL_WORKER_INFLIGHT:-1}"
   ENDURE_WORKER_HEARTBEAT_INTERVAL: "2.0"
   ENDURE_WORKER_HEARTBEAT_TIMEOUT: "15.0"
   ENDURE_LEADER_LOCK_TTL: "15.0"

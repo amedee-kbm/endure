@@ -33,10 +33,12 @@ class Worker(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hostname = models.CharField(max_length=256)
     pid = models.IntegerField()
-    # Runtime counter: {tenant_id: inflight_job_count} — updated on assign/complete/fail
-    tenant_inflight_job_count_map = models.JSONField(default=dict)
+    # Capacity is the only stored knob; the live load is always derived from
+    # jobs WHERE assigned_worker = this AND state IN (SCHEDULED, RUNNING).
+    # A maintained inflight counter was removed: three uncoordinated writers
+    # (scheduler assign, worker completion, heartbeat) raced read-modify-write
+    # until the counter pinned at max and starved dispatch permanently.
     max_inflight_jobs = models.IntegerField(default=4)
-    inflight_job_count = models.IntegerField(default=0)
     state = models.CharField(
         max_length=16,
         choices=WorkerState.choices,
