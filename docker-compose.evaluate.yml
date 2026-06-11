@@ -59,7 +59,9 @@ services:
       <<: *eval-env
     volumes:
       - reports:/tmp/endure-reports
-    restart: unless-stopped   # auto-restart after SIGKILL (required for E1/E2 recovery)
+    restart: unless-stopped   # covers daemon restarts only; restart policy does NOT revive
+                              # containers killed via CLI/API — chaos tests run with
+                              # --scale worker=2 so a survivor absorbs re-dispatch
 
   runner:
     profiles: ["eval"]

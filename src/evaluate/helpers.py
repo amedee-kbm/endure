@@ -347,6 +347,18 @@ def kill_one(service_name: str) -> tuple[str, float]:
     return name, t
 
 
+def kill_worker_owning(job_id: str) -> tuple[str, float]:
+    """SIGKILL the worker container currently assigned to job_id."""
+    job = get_job(job_id)
+    wid = job["assigned_worker_id"]
+    hostname = next(w["hostname"] for w in get_workers() if w["id"] == wid)
+    for c in find_service_containers("worker"):
+        if c.attrs["Config"]["Hostname"] == hostname:
+            c.kill()
+            return c.name, time.time()
+    raise RuntimeError(f"no worker container with hostname {hostname}")
+
+
 def kill_named(container_name: str) -> float:
     """SIGKILL a container by exact name. Returns kill_time_utc_epoch."""
     t = time.time()

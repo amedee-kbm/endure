@@ -46,7 +46,7 @@ def test_live_worker_kill_end_to_end():
     H.wait_for_state(job_id, "RUNNING", timeout=60)
     H.wait_for_checkpoint(job_id, min_count=1, timeout=60)  # past discover
 
-    _, t_kill = H.kill_one("worker")
+    _, t_kill = H.kill_worker_owning(job_id)
     state = H.get_job(job_id)["state"]
     assert state in ("RUNNING", "QUEUED", "SCHEDULED"), (
         f"kill landed too late (state={state}); raise ROWS and rerun"
