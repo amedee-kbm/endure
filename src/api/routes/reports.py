@@ -91,15 +91,14 @@ async def submit_report(request, data: ReportSubmitRequest):
         name=f"{data.report_type}-{data.tenant_id}",
         job_type=job_type,
         payload=payload,
-        state=JobState.SUBMITTED,
+        state=JobState.QUEUED,
         max_retries=data.max_retries,
         timeout_seconds=data.timeout_seconds,
     )
 
-    await record_event(job.id, "CREATED", detail=f"Report submitted: {data.report_type}")
-    job.state = JobState.QUEUED
-    await job.asave(update_fields=["state", "updated_at"])
-    await record_event(job.id, "QUEUED", detail="Enqueued for scheduling")
+    await record_event(
+        job.id, "QUEUED", detail=f"Job submitted and enqueued: {data.report_type}"
+    )
 
     return 201, _job_to_report_response(job)
 

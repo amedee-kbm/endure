@@ -196,76 +196,7 @@ class WorkerNode:
                 logger.warning(
                     f"Job {job_id} failed (attempt {job.attempt}/{job.max_retries}): {error_msg}"
                 )
-                await record_event(
-                    job.id,
-                    "FAILED",
-                    detail=error_msg,
-                    attempt=job.attempt,
-                    worker_id=str(self.worker_id),
-                )
-
-                if job.attempt < job.max_retries:
-                    delay = compute_retry_delay(job.attempt)
-                    updated = await Job.objects.filter(
-                        id=job_id,
-                        state=JobState.RUNNING,
-                        assigned_worker_id=self.worker_id,
-                    ).aupdate(
-                        state=JobState.QUEUED,
-                        assigned_worker_id=None,
-                        scheduled_at=None,
-                        started_at=None,
-                        error_message=error_msg,
-                        run_after=now + timedelta(seconds=delay),
-                        updated_at=now,
-                    )
-                    if updated == 0:
-                        logger.warning(
-                            f"Job {job_id}: ownership lost before QUEUED (retry) write"
-                        )
-                        return
-                    await record_event(
-                        job.id,
-                        "RETRIED",
-                        detail=f"Auto-retry: re-queued (attempt {job.attempt}/{job.max_retries})",
-                        attempt=job.attempt,
-                        worker_id=str(self.worker_id),
-                    )
-                    logger.info(
-                        f"Job {job_id} re-queued for retry "
-                        f"(attempt {job.attempt}/{job.max_retries}, delay={delay:.1f}s)"
-                    )
-                else:
-                    updated = await Job.objects.filter(
-                        id=job_id,
-                        state=JobState.RUNNING,
-                        assigned_worker_id=self.worker_id,
-                    ).aupdate(
-                        state=JobState.DEAD_LETTER,
-                        assigned_worker_id=None,
-                        error_message=error_msg,
-                        updated_at=now,
-                    )
-                    if updated == 0:
-                        logger.warning(
-                            f"Job {job_id}: ownership lost before DEAD_LETTER write"
-                        )
-                        return
-                    await DeadLetterJob.objects.acreate(
-                        job_id=job.id,
-                        final_error=error_msg,
-                        total_attempts=job.attempt,
-                    )
-                    await record_event(
-                        job.id,
-                        "DEAD_LETTER",
-                        detail=f"Moved to dead letter after {job.attempt} attempts: {error_msg}",
-                        attempt=job.attempt,
-                        worker_id=str(self.worker_id),
-                    )
-                    logger.error(
-                        f"Job {job_id} moved to dead letter after {job.attempt} attempts: {error_msg}"
-                    )
+                await self._fail_job(job, error_message=error_msg)
 
         except asyncio.CancelledError:
             logger.info(f"Job {job_id} execution cancelled.")
@@ -275,31 +206,109 @@ class WorkerNode:
                     t.uncancel()
         except Exception:
             logger.exception(f"Unexpected error executing job {job_id}")
-            try:
-                updated = await Job.objects.filter(
-                    id=job_id,
-                    state=JobState.RUNNING,
-                    assigned_worker_id=self.worker_id,
-                ).aupdate(
-                    state=JobState.FAILED,
-                    error_message="Worker execution error",
-                    updated_at=datetime.now(timezone.utc),
-                )
-                if updated and job is not None:
-                    await record_event(
-                        job.id,
-                        "FAILED",
-                        detail="Worker execution error (unhandled exception)",
-                        attempt=job.attempt,
-                        worker_id=str(self.worker_id),
+            # Route through the same retry/dead-letter logic as a result-failure
+            # so an unhandled crash never strands a job in a terminal FAILED state.
+            if job is not None:
+                try:
+                    await self._fail_job(
+                        job,
+                        error_message="Worker execution error",
+                        failed_event_detail="Worker execution error (unhandled exception)",
                     )
-            except Exception:
-                logger.exception(f"Failed to mark job {job_id} as failed")
+                except Exception:
+                    logger.exception(f"Failed to handle failure for job {job_id}")
         finally:
             # No counter bookkeeping: the scheduler derives load from live job
             # rows, and this job has left SCHEDULED/RUNNING by now either way.
             self._active_jobs.pop(job_id, None)
             self._cancelled_jobs.discard(job_id)
+
+    async def _fail_job(
+        self,
+        job: Job,
+        *,
+        error_message: str,
+        failed_event_detail: str | None = None,
+    ):
+        """
+        Route a failed RUNNING job through retry-or-dead-letter.
+
+        Shared by the normal result-failure path and the unhandled-exception
+        path so both honour the same CAS gate and emit the same events. Every
+        write is ownership-gated (state=RUNNING ∧ assigned_worker_id=self): if
+        the row moved on, aupdate returns 0 and we skip silently.
+        """
+        now = datetime.now(timezone.utc)
+        await record_event(
+            job.id,
+            "FAILED",
+            detail=failed_event_detail or error_message,
+            attempt=job.attempt,
+            worker_id=str(self.worker_id),
+        )
+
+        if job.attempt < job.max_retries:
+            delay = compute_retry_delay(job.attempt)
+            updated = await Job.objects.filter(
+                id=job.id,
+                state=JobState.RUNNING,
+                assigned_worker_id=self.worker_id,
+            ).aupdate(
+                state=JobState.QUEUED,
+                assigned_worker_id=None,
+                scheduled_at=None,
+                started_at=None,
+                error_message=error_message,
+                run_after=now + timedelta(seconds=delay),
+                updated_at=now,
+            )
+            if updated == 0:
+                logger.warning(
+                    f"Job {job.id}: ownership lost before QUEUED (retry) write"
+                )
+                return
+            await record_event(
+                job.id,
+                "RETRIED",
+                detail=f"Auto-retry: re-queued (attempt {job.attempt}/{job.max_retries})",
+                attempt=job.attempt,
+                worker_id=str(self.worker_id),
+            )
+            logger.info(
+                f"Job {job.id} re-queued for retry "
+                f"(attempt {job.attempt}/{job.max_retries}, delay={delay:.1f}s)"
+            )
+        else:
+            updated = await Job.objects.filter(
+                id=job.id,
+                state=JobState.RUNNING,
+                assigned_worker_id=self.worker_id,
+            ).aupdate(
+                state=JobState.DEAD_LETTER,
+                assigned_worker_id=None,
+                error_message=error_message,
+                updated_at=now,
+            )
+            if updated == 0:
+                logger.warning(
+                    f"Job {job.id}: ownership lost before DEAD_LETTER write"
+                )
+                return
+            await DeadLetterJob.objects.acreate(
+                job_id=job.id,
+                final_error=error_message,
+                total_attempts=job.attempt,
+            )
+            await record_event(
+                job.id,
+                "DEAD_LETTER",
+                detail=f"Moved to dead letter after {job.attempt} attempts: {error_message}",
+                attempt=job.attempt,
+                worker_id=str(self.worker_id),
+            )
+            logger.error(
+                f"Job {job.id} moved to dead letter after {job.attempt} attempts: {error_message}"
+            )
 
 
 async def run_worker(max_inflight_jobs: int | None = None):

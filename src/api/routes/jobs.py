@@ -26,16 +26,14 @@ async def submit_job(request, data: JobSubmitRequest):
         name=data.name,
         job_type=data.job_type,
         payload=data.payload,
-        state=JobState.SUBMITTED,
+        state=JobState.QUEUED,
         max_retries=data.max_retries,
         timeout_seconds=data.timeout_seconds,
     )
 
-    await record_event(job.id, "CREATED", detail=f"Job submitted: {data.name}")
-
-    job.state = JobState.QUEUED
-    await job.asave(update_fields=["state", "updated_at"])
-    await record_event(job.id, "QUEUED", detail="Enqueued for scheduling")
+    await record_event(
+        job.id, "QUEUED", detail=f"Job submitted and enqueued: {data.name}"
+    )
 
     return 201, job
 
@@ -70,16 +68,20 @@ async def list_jobs(
 
 @router.post("/{job_id}/cancel", response=JobResponse)
 async def cancel_job(request, job_id: uuid.UUID):
-    job = await Job.objects.filter(id=job_id).afirst()
-    if not job:
-        raise HttpError(404, "Job not found")
+    now = datetime.now(timezone.utc)
+    updated = await Job.objects.filter(
+        id=job_id, state__in=CANCELLABLE_STATES
+    ).aupdate(state=JobState.CANCELLED, completed_at=now, updated_at=now)
 
-    if job.state not in CANCELLABLE_STATES:
+    if updated == 0:
+        # CAS miss: either the job vanished or it left a cancellable state
+        # between our intent and the write. Re-read for the truthful response.
+        job = await Job.objects.filter(id=job_id).afirst()
+        if not job:
+            raise HttpError(404, "Job not found")
         raise HttpError(409, f"Cannot cancel job in state {job.state}")
 
-    job.state = JobState.CANCELLED
-    job.completed_at = datetime.now(timezone.utc)
-    await job.asave(update_fields=["state", "completed_at", "updated_at"])
+    job = await Job.objects.filter(id=job_id).afirst()
     await record_event(job.id, "CANCELLED", detail="Job cancelled by user")
 
     return job
@@ -91,40 +93,44 @@ async def retry_job(request, job_id: uuid.UUID):
     if not job:
         raise HttpError(404, "Job not found")
 
-    if job.state not in RETRYABLE_STATES:
+    old_state = job.state
+    old_attempt = job.attempt
+
+    now = datetime.now(timezone.utc)
+    updated = await Job.objects.filter(
+        id=job_id, state__in=RETRYABLE_STATES
+    ).aupdate(
+        state=JobState.QUEUED,
+        attempt=0,
+        error_message=None,
+        assigned_worker_id=None,
+        scheduled_at=None,
+        started_at=None,
+        completed_at=None,
+        run_after=None,
+        updated_at=now,
+    )
+
+    if updated == 0:
+        # CAS miss: the job left DEAD_LETTER (or never existed) since our read.
+        job = await Job.objects.filter(id=job_id).afirst()
+        if not job:
+            raise HttpError(404, "Job not found")
         raise HttpError(
             409,
             f"Cannot retry job in state {job.state}. Job must be in DEAD_LETTER.",
         )
 
-    await record_event(
-        job.id,
-        "MANUAL_RETRY",
-        detail=f"Manual retry from state {job.state}",
-        attempt=job.attempt,
-    )
-
+    # Only now that we own the transition do we drop the dead-letter record.
     await DeadLetterJob.objects.filter(job_id=job_id).adelete()
 
-    job.state = JobState.QUEUED
-    job.attempt = 0
-    job.error_message = None
-    job.assigned_worker_id = None
-    job.scheduled_at = None
-    job.started_at = None
-    job.completed_at = None
-    await job.asave(
-        update_fields=[
-            "state",
-            "attempt",
-            "error_message",
-            "assigned_worker",
-            "scheduled_at",
-            "started_at",
-            "completed_at",
-            "updated_at",
-        ]
+    await record_event(
+        job_id,
+        "MANUAL_RETRY",
+        detail=f"Manual retry from state {old_state}",
+        attempt=old_attempt,
     )
+    job = await Job.objects.filter(id=job_id).afirst()
     await record_event(job.id, "QUEUED", detail="Re-queued after manual retry")
 
     return job

@@ -73,7 +73,7 @@ class Job(models.Model):
     state = models.CharField(
         max_length=16,
         choices=JobState.choices,
-        default=JobState.SUBMITTED,
+        default=JobState.QUEUED,
         db_index=True,
     )
     attempt = models.IntegerField(default=0)
@@ -259,6 +259,7 @@ class StepOutput(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "step_outputs"
         unique_together = [("job", "stage_name", "step_id")]
         ordering = ["stage_name", "step_id"]
 
